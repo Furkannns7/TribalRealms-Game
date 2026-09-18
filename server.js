@@ -109,6 +109,8 @@ function buildVillagePayload(villageId) {
 }
 
 function startServer(port) {
+  // Render'in verdigi dinamik portu oncelikli olarak alir
+  const actualPort = process.env.PORT || port || 3000;
   const app = express();
   app.use(express.json());
   app.use(express.static(path.join(__dirname, 'webapp')));
@@ -142,8 +144,9 @@ function startServer(port) {
     res.json({ success: true, timeSeconds: result.timeSeconds, ...buildVillagePayload(auth.village.id) });
   });
 
-  app.listen(port, () => {
-    console.log(`Mini App sunucusu http://localhost:${port} adresinde calisiyor.`);
+  // Bulut ortami icin 0.0.0.0 host adresi uzerinden dinleme yapilir
+  app.listen(actualPort, '0.0.0.0', () => {
+    console.log(`Mini App sunucusu ${actualPort} portunda (0.0.0.0) calisiyor.`);
   });
 }
 
