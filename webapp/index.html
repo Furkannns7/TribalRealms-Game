@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>Köyüm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Roboto+Slab:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+<!-- ===== SVG IKON SETI (hicbir yerde gorunmez, <use> ile cagrilir) ===== -->
+<svg style="display:none" aria-hidden="true">
+<defs>
+
+  <symbol id="icon-main_building" viewBox="0 0 64 64">
+    <ellipse cx="32" cy="54" rx="24" ry="5" class="ic-shadow" />
+    <polygon points="10,32 32,12 54,32" class="ic-roof" />
+    <rect x="14" y="32" width="36" height="22" class="ic-wall" />
+    <rect x="26" y="40" width="12" height="14" class="ic-door" />
+    <rect x="18" y="36" width="6" height="6" class="ic-window" />
+    <rect x="40" y="36" width="6" height="6" class="ic-window" />
+    <line x1="32" y1="12" x2="32" y2="3" class="ic-pole" />
+    <polygon points="32,3 44,7 32,11" class="ic-flag" />
+  </symbol>
+
+  <symbol id="icon-woodcutter" viewBox="0 0 64 64">
+    <ellipse cx="30" cy="52" rx="22" ry="5" class="ic-shadow" />
+    <rect x="12" y="38" width="34" height="8" rx="4" class="ic-log" />
+    <rect x="12" y="28" width="34" height="8" rx="4" class="ic-log-alt" />
+    <rect x="12" y="18" width="34" height="8" rx="4" class="ic-log" />
+    <circle cx="15" cy="42" r="3.2" class="ic-log-end" />
+    <circle cx="15" cy="32" r="3.2" class="ic-log-end" />
+    <circle cx="15" cy="22" r="3.2" class="ic-log-end" />
+    <line x1="48" y1="10" x2="38" y2="30" class="ic-handle" />
+    <polygon points="46,6 58,10 50,18 44,14" class="ic-blade" />
+  </symbol>
+
+  <symbol id="icon-clay_pit" viewBox="0 0 64 64">
+    <ellipse cx="32" cy="54" rx="24" ry="5" class="ic-shadow" />
+    <rect x="10" y="36" width="13" height="9" class="ic-brick" />
+    <rect x="25" y="36" width="13" height="9" class="ic-brick-alt" />
+    <rect x="40" y="36" width="13" height="9" class="ic-brick" />
+    <rect x="17" y="26" width="13" height="9" class="ic-brick-alt" />
+    <rect x="32" y="26" width="13" height="9" class="ic-brick" />
+    <rect x="24" y="16" width="13" height="9" class="ic-brick-alt" />
+  </symbol>
+
+  <symbol id="icon-iron_mine" viewBox="0 0 64 64">
+    <ellipse cx="32" cy="54" rx="24" ry="5" class="ic-shadow" />
+    <polygon points="6,50 32,12 58,50" class="ic-mountain" />
+    <polygon points="32,12 58,50 40,50" class="ic-mountain-shade" />
+    <ellipse cx="32" cy="49" rx="9" ry="11" class="ic-cave" />
+    <line x1="20" y1="20" x2="34" y2="34" class="ic-pick" />
+    <line x1="34" y1="20" x2="20" y2="34" class="ic-pick" />
+    <polygon points="17,17 25,17 20,24" class="ic-pick-head" />
+  </symbol>
+
+  <symbol id="icon-grain_field" viewBox="0 0 64 64">
+    <ellipse cx="32" cy="52" rx="26" ry="6" class="ic-mound" />
+    <g class="ic-stalk">
+      <line x1="16" y1="46" x2="16" y2="20" />
+      <line x1="26" y1="46" x2="24" y2="14" />
+      <line x1="38" y1="46" x2="40" y2="14" />
+      <line x1="48" y1="46" x2="48" y2="20" />
+    </g>
+    <g class="ic-ear">
+      <ellipse cx="16" cy="18" rx="4" ry="6" />
+      <ellipse cx="24" cy="12" rx="4.5" ry="7" />
+      <ellipse cx="40" cy="12" rx="4.5" ry="7" />
+      <ellipse cx="48" cy="18" rx="4" ry="6" />
+    </g>
+  </symbol>
+
+  <symbol id="icon-warehouse" viewBox="0 0 64 64">
+    <ellipse cx="32" cy="54" rx="25" ry="5" class="ic-shadow" />
+    <polygon points="7,28 32,14 57,28 57,32 7,32" class="ic-roof" />
+    <rect x="10" y="30" width="44" height="22" class="ic-wall-alt" />
+    <rect x="22" y="34" width="20" height="18" class="ic-door" />
+    <line x1="22" y1="34" x2="42" y2="52" class="ic-brace" />
+    <line x1="42" y1="34" x2="22" y2="52" class="ic-brace" />
+  </symbol>
+
+  <symbol id="icon-granary" viewBox="0 0 64 64">
+    <ellipse cx="32" cy="54" rx="20" ry="5" class="ic-shadow" />
+    <rect x="20" y="24" width="24" height="28" rx="3" class="ic-silo" />
+    <ellipse cx="32" cy="24" rx="12" ry="7" class="ic-silo-top" />
+    <ellipse cx="32" cy="15" rx="6" ry="5" class="ic-roof" />
+    <rect x="20" y="34" width="24" height="4" class="ic-silo-band" />
+    <rect x="20" y="43" width="24" height="4" class="ic-silo-band" />
+  </symbol>
+
+  <symbol id="icon-res-wood" viewBox="0 0 32 32">
+    <rect x="4" y="12" width="24" height="9" rx="4.5" class="ic-log" />
+    <ellipse cx="7.5" cy="16.5" rx="3.2" ry="4.4" class="ic-log-end" />
+    <ellipse cx="24.5" cy="16.5" rx="3.2" ry="4.4" class="ic-log-end" />
+  </symbol>
+
+  <symbol id="icon-res-clay" viewBox="0 0 32 32">
+    <rect x="5" y="8" width="22" height="8" class="ic-brick" />
+    <rect x="5" y="17" width="22" height="8" class="ic-brick-alt" />
+  </symbol>
+
+  <symbol id="icon-res-iron" viewBox="0 0 32 32">
+    <polygon points="16,3 27,16 16,29 5,16" class="ic-mountain" />
+    <polygon points="16,3 27,16 16,20" class="ic-mountain-shade" />
+  </symbol>
+
+  <symbol id="icon-res-grain" viewBox="0 0 32 32">
+    <g class="ic-stalk">
+      <line x1="10" y1="27" x2="11" y2="10" />
+      <line x1="16" y1="27" x2="16" y2="6" />
+      <line x1="22" y1="27" x2="21" y2="10" />
+    </g>
+    <g class="ic-ear">
+      <ellipse cx="11" cy="8" rx="3" ry="5" />
+      <ellipse cx="16" cy="5" rx="3.4" ry="5.6" />
+      <ellipse cx="21" cy="8" rx="3" ry="5" />
+    </g>
+  </symbol>
+
+  <symbol id="icon-hammer" viewBox="0 0 32 32">
+    <line x1="9" y1="23" x2="20" y2="12" class="ic-handle" />
+    <polygon points="18,7 27,7 27,14 20,17 15,12" class="ic-blade" />
+  </symbol>
+
+  <symbol id="icon-close" viewBox="0 0 24 24">
+    <line x1="5" y1="5" x2="19" y2="19" />
+    <line x1="19" y1="5" x2="5" y2="19" />
+  </symbol>
+
+</defs>
+</svg>
+
+<!-- ===== UYGULAMA ISKELETI ===== -->
+<div id="app">
+
+  <header id="resource-bar">
+    <div class="res-chip" data-res="wood">
+      <svg class="res-icon"><use href="#icon-res-wood" /></svg>
+      <span class="res-amount">–</span>
+      <span class="res-rate">–</span>
+    </div>
+    <div class="res-chip" data-res="clay">
+      <svg class="res-icon"><use href="#icon-res-clay" /></svg>
+      <span class="res-amount">–</span>
+      <span class="res-rate">–</span>
+    </div>
+    <div class="res-chip" data-res="iron">
+      <svg class="res-icon"><use href="#icon-res-iron" /></svg>
+      <span class="res-amount">–</span>
+      <span class="res-rate">–</span>
+    </div>
+    <div class="res-chip" data-res="grain">
+      <svg class="res-icon"><use href="#icon-res-grain" /></svg>
+      <span class="res-amount">–</span>
+      <span class="res-rate">–</span>
+    </div>
+  </header>
+
+  <h1 id="village-name">Köyüm</h1>
+
+  <main id="view-village">
+    <div id="village-scene">
+      <!-- bina isaretleri app.js tarafindan buraya eklenir -->
+    </div>
+  </main>
+
+  <main id="view-placeholder" hidden>
+    <div class="placeholder-card">
+      <svg class="placeholder-icon"><use href="#icon-hammer" /></svg>
+      <p id="placeholder-text">Bu özellik yakında eklenecek.</p>
+    </div>
+  </main>
+
+  <nav id="tab-bar">
+    <button class="tab-btn active" data-tab="village">Köyüm</button>
+    <button class="tab-btn" data-tab="military">Askeriye</button>
+    <button class="tab-btn" data-tab="market">Pazar</button>
+    <button class="tab-btn" data-tab="attack">Saldır</button>
+  </nav>
+
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <p id="loading-text">Köyün yükleniyor…</p>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+
+</div>
+
+<!-- ===== BINA DETAY PANELI (alt sayfa) ===== -->
+<div id="sheet-backdrop" class="hidden"></div>
+<div id="building-sheet" class="hidden" aria-hidden="true">
+  <div class="sheet-handle"></div>
+  <button id="sheet-close" aria-label="Kapat">
+    <svg><use href="#icon-close" /></svg>
+  </button>
+
+  <div class="sheet-header">
+    <svg id="sheet-icon" class="sheet-building-icon"><use id="sheet-icon-use" href="#icon-main_building" /></svg>
+    <div>
+      <h2 id="sheet-name">Bina</h2>
+      <p id="sheet-level">Seviye 1</p>
+    </div>
+  </div>
+
+  <p id="sheet-description">Açıklama</p>
+
+  <div id="sheet-progress" class="hidden">
+    <div class="progress-track"><div id="progress-fill" class="progress-fill"></div></div>
+    <p id="sheet-countdown">İnşa ediliyor…</p>
+  </div>
+
+  <div id="sheet-cost-box">
+    <p class="sheet-cost-label">Sonraki seviye maliyeti</p>
+    <div id="sheet-cost-chips" class="cost-chips"></div>
+    <p id="sheet-time" class="sheet-time"></p>
+  </div>
+
+  <button id="sheet-upgrade-btn" class="upgrade-btn">Yükselt</button>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

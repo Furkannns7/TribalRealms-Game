@@ -1,0 +1,583 @@
+/* style.css
+   Tasarim yonu: elle cizilmis, sicak "kasaba tahtasi" hissi veren, duz
+   (flat) sekillerle insa edilmis bir koy sahnesi. Renkler cim/topraktan,
+   basliklar oyulmus tabela hissi veren bir slab-serif'ten geliyor.
+*/
+
+:root {
+  --grass: #7fae6b;
+  --grass-dark: #5f8f4e;
+  --grass-darker: #4c7540;
+  --path: #cdac7d;
+  --wood-dark: #4a3423;
+  --wood-mid: #8a6240;
+  --wood-light: #c99a63;
+  --roof-red: #b5482f;
+  --roof-red-dark: #8f3722;
+  --stone: #938d7c;
+  --stone-dark: #726c5d;
+  --gold: #d9a441;
+  --gold-dark: #b8862f;
+  --parchment: #f4ecd8;
+  --parchment-dark: #e6d9b8;
+  --ink: #2e2418;
+  --ink-soft: #5a4c3a;
+  --danger: #b5432f;
+  --shadow: rgba(30, 22, 12, 0.35);
+
+  --font-display: 'Roboto Slab', serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: var(--grass-darker);
+  font-family: var(--font-body);
+  color: var(--ink);
+  overscroll-behavior: none;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  padding-top: env(safe-area-inset-top);
+  overflow: hidden;
+}
+
+/* ---------- Kaynak cubugu ---------- */
+
+#resource-bar {
+  display: flex;
+  gap: 6px;
+  padding: 10px 10px 8px;
+  background: var(--parchment);
+  border-bottom: 3px solid var(--wood-mid);
+}
+
+.res-chip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--parchment-dark);
+  border-radius: 10px;
+  padding: 5px 7px;
+  min-width: 0;
+}
+
+.res-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.res-amount {
+  font-weight: 700;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.res-rate {
+  font-size: 10px;
+  color: var(--ink-soft);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+#village-name {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  margin: 8px 0 4px;
+  color: var(--parchment);
+  text-shadow: 0 2px 0 var(--shadow);
+}
+
+/* ---------- Koy sahnesi ---------- */
+
+#view-village {
+  flex: 1;
+  min-height: 0;
+  padding: 0 10px 10px;
+}
+
+#village-scene {
+  position: relative;
+  height: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 30%, var(--grass) 0%, var(--grass-dark) 70%),
+    var(--grass-dark);
+  box-shadow: inset 0 0 0 4px var(--wood-mid), inset 0 0 40px rgba(0,0,0,0.15);
+}
+
+/* Kivrilan toprak yol: birkac blurlu elips ust uste binerek yol izlenimi verir */
+#village-scene::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 12% at 50% 18%, var(--path) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 14% at 22% 45%, var(--path) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 14% at 78% 45%, var(--path) 0%, transparent 70%),
+    radial-gradient(ellipse 55% 12% at 32% 70%, var(--path) 0%, transparent 70%),
+    radial-gradient(ellipse 55% 12% at 68% 70%, var(--path) 0%, transparent 70%),
+    radial-gradient(ellipse 70% 12% at 50% 90%, var(--path) 0%, transparent 70%);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.building-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.building-marker .marker-plot {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--parchment);
+  border: 3px solid var(--wood-mid);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 0 var(--shadow);
+  transition: transform 0.12s ease;
+  position: relative;
+}
+
+.building-marker:active .marker-plot {
+  transform: translateY(2px) scale(0.96);
+  box-shadow: 0 2px 0 var(--shadow);
+}
+
+.building-marker .marker-icon {
+  width: 38px;
+  height: 38px;
+}
+
+.building-marker .marker-level {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  min-width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--parchment);
+  padding: 0 4px;
+}
+
+.building-marker .marker-label {
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--parchment);
+  background: rgba(46, 36, 24, 0.55);
+  padding: 1px 6px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.building-marker.is-building .marker-plot {
+  border-color: var(--gold);
+  animation: pulse-ring 1.4s ease-in-out infinite;
+}
+
+.building-marker .marker-timer {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 999px;
+  border: 2px solid var(--parchment);
+  white-space: nowrap;
+}
+
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 4px 0 var(--shadow), 0 0 0 0 rgba(217, 164, 65, 0.55); }
+  50% { box-shadow: 0 4px 0 var(--shadow), 0 0 0 6px rgba(217, 164, 65, 0); }
+}
+
+/* ---------- Alt sekme cubugu ---------- */
+
+#tab-bar {
+  display: flex;
+  background: var(--parchment);
+  border-top: 3px solid var(--wood-mid);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.tab-btn {
+  flex: 1;
+  border: none;
+  background: none;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  padding: 12px 4px 10px;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  color: var(--roof-red);
+  box-shadow: inset 0 3px 0 var(--roof-red);
+}
+
+/* ---------- Yer tutucu ekranlar (Askeriye/Pazar/Saldir) ---------- */
+
+#view-placeholder {
+  flex: 1;
+  min-height: 0;
+  padding: 0 10px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.placeholder-card {
+  background: var(--parchment);
+  border-radius: 18px;
+  padding: 32px 24px;
+  text-align: center;
+  max-width: 280px;
+}
+
+.placeholder-icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 10px;
+}
+
+.placeholder-icon .ic-handle { stroke: var(--wood-dark); stroke-width: 3; }
+.placeholder-icon .ic-blade { fill: var(--stone); stroke: var(--stone-dark); stroke-width: 1; }
+
+#placeholder-text {
+  font-size: 14px;
+  color: var(--ink-soft);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ---------- Yukleniyor katmani ---------- */
+
+#loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--grass-darker);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  z-index: 50;
+  transition: opacity 0.25s ease;
+}
+
+#loading-overlay.hidden { opacity: 0; pointer-events: none; }
+
+.spinner {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 4px solid rgba(244, 236, 216, 0.25);
+  border-top-color: var(--parchment);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+#loading-text {
+  color: var(--parchment);
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+/* ---------- Toast (kisa uyari) ---------- */
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 78px;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--ink);
+  color: var(--parchment);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 80;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  max-width: 85%;
+  text-align: center;
+}
+
+#toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+#toast.hidden { display: none; }
+
+/* ---------- Bina detay paneli (bottom sheet) ---------- */
+
+#sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 15, 8, 0.5);
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+#sheet-backdrop.hidden { display: none; }
+#sheet-backdrop.show { opacity: 1; }
+
+#building-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: var(--parchment);
+  border-radius: 22px 22px 0 0;
+  padding: 10px 20px calc(20px + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 30px var(--shadow);
+  transform: translateY(100%);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  max-height: 78vh;
+  overflow-y: auto;
+}
+
+#building-sheet.hidden { display: none; }
+#building-sheet.show { transform: translateY(0); }
+
+.sheet-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--wood-light);
+  border-radius: 999px;
+  margin: 4px auto 10px;
+}
+
+#sheet-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: var(--parchment-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+#sheet-close svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--ink);
+  stroke-width: 2.4;
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 6px 0 8px;
+}
+
+.sheet-building-icon {
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+}
+
+#sheet-name {
+  font-family: var(--font-display);
+  font-size: 19px;
+  margin: 0 0 2px;
+}
+
+#sheet-level {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+
+#sheet-description {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0 0 14px;
+}
+
+#sheet-progress {
+  margin-bottom: 14px;
+}
+
+#sheet-progress.hidden { display: none; }
+
+.progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--parchment-dark);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--gold);
+  border-radius: 999px;
+  width: 0%;
+  transition: width 0.3s linear;
+}
+
+#sheet-countdown {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold-dark);
+  text-align: center;
+}
+
+.sheet-cost-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  margin: 0 0 6px;
+}
+
+.cost-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.cost-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--parchment-dark);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.cost-chip svg { width: 15px; height: 15px; }
+
+.cost-chip.insufficient {
+  background: #f3d9d2;
+  color: var(--danger);
+}
+
+.sheet-time {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 0 0 16px;
+}
+
+.upgrade-btn {
+  width: 100%;
+  border: none;
+  border-radius: 14px;
+  background: var(--roof-red);
+  color: var(--parchment);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 15px;
+  padding: 14px;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--roof-red-dark);
+  transition: transform 0.1s ease;
+}
+
+.upgrade-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--roof-red-dark); }
+
+.upgrade-btn:disabled {
+  background: var(--stone);
+  box-shadow: 0 3px 0 var(--stone-dark);
+  cursor: default;
+  opacity: 0.75;
+}
+
+/* ---------- SVG ikon renkleri (bina + kaynak sembolleri) ---------- */
+
+.ic-shadow { fill: rgba(30, 22, 12, 0.22); }
+.ic-mound { fill: var(--path); }
+.ic-wall { fill: var(--parchment-dark); stroke: var(--wood-dark); stroke-width: 1.5; }
+.ic-wall-alt { fill: var(--wood-light); stroke: var(--wood-dark); stroke-width: 1.5; }
+.ic-roof { fill: var(--roof-red); stroke: var(--roof-red-dark); stroke-width: 1; }
+.ic-door { fill: var(--wood-dark); }
+.ic-window { fill: var(--stone); }
+.ic-pole { stroke: var(--wood-dark); stroke-width: 2; }
+.ic-flag { fill: var(--gold); }
+
+.ic-log { fill: var(--wood-mid); stroke: var(--wood-dark); stroke-width: 1; }
+.ic-log-alt { fill: var(--wood-light); stroke: var(--wood-dark); stroke-width: 1; }
+.ic-log-end { fill: var(--wood-light); stroke: var(--wood-dark); stroke-width: 1; }
+.ic-handle { stroke: var(--wood-dark); stroke-width: 3; stroke-linecap: round; }
+.ic-blade { fill: var(--stone); stroke: var(--stone-dark); stroke-width: 1; }
+
+.ic-brick { fill: var(--roof-red); stroke: var(--roof-red-dark); stroke-width: 1; }
+.ic-brick-alt { fill: #c96a4c; stroke: var(--roof-red-dark); stroke-width: 1; }
+
+.ic-mountain { fill: var(--stone); }
+.ic-mountain-shade { fill: var(--stone-dark); }
+.ic-cave { fill: var(--ink); opacity: 0.85; }
+.ic-pick { stroke: var(--wood-dark); stroke-width: 2.4; stroke-linecap: round; }
+.ic-pick-head { fill: var(--stone-dark); }
+
+.ic-stalk { stroke: #6f9a3f; stroke-width: 2; stroke-linecap: round; }
+.ic-ear { fill: var(--gold); }
+
+.ic-silo { fill: var(--stone); stroke: var(--stone-dark); stroke-width: 1.5; }
+.ic-silo-top { fill: var(--stone); stroke: var(--stone-dark); stroke-width: 1.5; }
+.ic-silo-band { fill: var(--stone-dark); }
+
+#icon-close line { stroke: currentColor; }
+
+/* ---------- Genis ekranlar (masaustu test icin de makul gorunsun) ---------- */
+
+@media (min-width: 480px) {
+  #app { max-width: 480px; margin: 0 auto; }
+  html, body { background: var(--wood-dark); }
+}

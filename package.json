@@ -1,0 +1,18 @@
+{
+  "name": "travian-telegram-bot",
+  "version": "1.0.0",
+  "description": "Travian benzeri, Telegram Mini App uzerinde gorsel olarak oynanan cok oyunculu koy kurma/strateji oyunu botu",
+  "main": "bot.js",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3",
+    "telegraf": "^4.16.3"
+  }
+}
