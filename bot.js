@@ -63,11 +63,14 @@ bot.command('koy', (ctx) => {
 // BOTU VE ARKA PLAN SERVISLERINI BASLAT
 // ---------------------------------------------------------
 
+// 1. Once web sunucusunu ve zamanlayiciyi baslat (Render port taramasini gecmek icin)
+startServer(PORT);
+startScheduler();
+
+// 2. Telegram botunu baslat
 bot.launch()
   .then(() => {
     console.log('Bot basariyla baslatildi!');
-    startScheduler();
-    startServer(PORT);
   })
   .catch((err) => console.error('Bot baslatilamadi:', err));
 
