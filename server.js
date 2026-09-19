@@ -10,7 +10,7 @@ const crypto = require('crypto');
 const path = require('path');
 const { db } = require('./database');
 const {
-  BUILDINGS, CIVILIZATIONS, MILITARY_UNITS,
+  BUILDINGS, CIVILIZATIONS, MILITARY_UNITS, WORLD_SIZE,
   getUpgradeCost, getUpgradeTimeSeconds, getUnitsForCivilization, getTrainTimeSeconds
 } = require('./game-config');
 const { getVillageBuildings, getBuilding, startUpgrade, refreshVillage } = require('./buildings');
@@ -307,6 +307,42 @@ function startServer(port) {
     completeFinishedAttacks();
     const rows = getReportsForUser(dbUser.id, 30);
     res.json({ reports: rows.map((r) => formatReport(r, dbUser.id)) });
+  });
+
+  // Dunya haritasindaki tum koyleri (sahibi, medeniyeti, konumu, benden
+  // uzakligi) getirir. Kaynak/ordu bilgisi PAYLASILMAZ, sadece harita icin
+  // gereken genel bilgiler doner.
+  app.post('/api/map', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+
+    const myVillage = getVillageForUser(dbUser);
+
+    const rows = db.prepare(`
+      SELECT v.id, v.name, v.x, v.y, u.telegram_id, u.username, u.first_name, u.civilization
+      FROM villages v JOIN users u ON u.id = v.user_id
+    `).all();
+
+    const villages = rows.map((r) => {
+      const isMine = !!myVillage && r.id === myVillage.id;
+      const distance = (myVillage && !isMine)
+        ? Math.round(Math.sqrt(Math.pow(r.x - myVillage.x, 2) + Math.pow(r.y - myVillage.y, 2)))
+        : 0;
+      return {
+        id: r.id,
+        name: r.name,
+        x: r.x,
+        y: r.y,
+        ownerName: r.username ? '@' + r.username : r.first_name,
+        ownerUsername: r.username || null,
+        ownerTelegramId: r.telegram_id,
+        civilization: r.civilization,
+        isMine,
+        distance
+      };
+    });
+
+    res.json({ worldSize: WORLD_SIZE, villages });
   });
 
   app.listen(port, () => {

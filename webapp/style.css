@@ -881,6 +881,105 @@ html, body {
 .ic-horseshoe { fill: none; stroke: var(--wood-mid); stroke-width: 4; stroke-linecap: round; }
 .ic-horseshoe-nail { fill: var(--wood-dark); }
 
+/* ---------- Dunya haritasi ---------- */
+
+#view-map {
+  flex: 1;
+  min-height: 0;
+  padding: 0 10px 10px;
+}
+
+#map-scene {
+  height: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #ddc9a3;
+  box-shadow: inset 0 0 0 4px var(--wood-mid), inset 0 0 30px rgba(0,0,0,0.12);
+}
+
+#map-svg { width: 100%; height: 100%; display: block; }
+
+.map-grid-line { stroke: rgba(74, 52, 35, 0.14); stroke-width: 0.05; }
+
+.map-village-dot {
+  stroke: var(--wood-dark);
+  stroke-width: 0.15;
+  cursor: pointer;
+}
+
+.map-village-dot.civ-roma { fill: #6b8cae; }
+.map-village-dot.civ-galya { fill: #5f8f4e; }
+.map-village-dot.civ-toton { fill: var(--roof-red); }
+
+.map-village-dot.is-mine {
+  fill: var(--gold);
+  stroke: var(--ink);
+  stroke-width: 0.2;
+}
+
+.map-village-label {
+  font-size: 1.6px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  fill: var(--ink);
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+/* ---------- Harita: koy bilgi paneli (mevcut bottom-sheet ile ayni gorunum) ---------- */
+
+#village-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 15, 8, 0.5);
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+#village-sheet-backdrop.hidden { display: none; }
+#village-sheet-backdrop.show { opacity: 1; }
+
+#village-info-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: var(--parchment);
+  border-radius: 22px 22px 0 0;
+  padding: 10px 20px calc(20px + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 30px var(--shadow);
+  transform: translateY(100%);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+#village-info-sheet.hidden { display: none; }
+#village-info-sheet.show { transform: translateY(0); }
+
+#village-sheet-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: var(--parchment-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+#village-sheet-close svg { width: 14px; height: 14px; stroke: var(--ink); stroke-width: 2.4; }
+
+#village-info-name {
+  font-family: var(--font-display);
+  font-size: 19px;
+  margin: 10px 0 4px;
+}
+
 
 @media (min-width: 480px) {
   #app { max-width: 480px; margin: 0 auto; }

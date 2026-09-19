@@ -41,6 +41,7 @@
   };
 
   const RESOURCE_ICON = { wood: 'icon-res-wood', clay: 'icon-res-clay', iron: 'icon-res-iron', grain: 'icon-res-grain' };
+  const CIVILIZATION_NAMES = { roma: 'Roma', galya: 'Galya', toton: 'Töton' };
 
   // ---------------------------------------------------------
   // DURUM (STATE)
@@ -72,6 +73,8 @@
     toast: document.getElementById('toast'),
     tabBar: document.getElementById('tab-bar'),
     viewVillage: document.getElementById('view-village'),
+    viewMap: document.getElementById('view-map'),
+    mapSvg: document.getElementById('map-svg'),
     viewMilitary: document.getElementById('view-military'),
     viewAttack: document.getElementById('view-attack'),
     viewPlaceholder: document.getElementById('view-placeholder'),
@@ -100,7 +103,14 @@
     attackUnitList: document.getElementById('attack-unit-list'),
     attackSendBtn: document.getElementById('attack-send-btn'),
     outgoingList: document.getElementById('outgoing-list'),
-    reportsList: document.getElementById('reports-list')
+    reportsList: document.getElementById('reports-list'),
+    villageSheetBackdrop: document.getElementById('village-sheet-backdrop'),
+    villageInfoSheet: document.getElementById('village-info-sheet'),
+    villageSheetClose: document.getElementById('village-sheet-close'),
+    villageInfoName: document.getElementById('village-info-name'),
+    villageInfoOwner: document.getElementById('village-info-owner'),
+    villageInfoDetail: document.getElementById('village-info-detail'),
+    villageInfoAttackBtn: document.getElementById('village-info-attack-btn')
   };
 
   for (const chip of document.querySelectorAll('.res-chip')) {
@@ -573,6 +583,123 @@
   });
 
   // ---------------------------------------------------------
+  // DUNYA HARITASI
+  // ---------------------------------------------------------
+
+  const CIV_CLASS = { roma: 'civ-roma', galya: 'civ-galya', toton: 'civ-toton' };
+  let mapVillages = [];
+  let activeMapVillageId = null;
+
+  async function fetchMap() {
+    try {
+      const data = await apiPost('/api/map', {});
+      mapVillages = data.villages;
+      renderMap(data.worldSize, data.villages);
+    } catch (err) {
+      showToast(err.message || 'Harita yüklenemedi.');
+    }
+  }
+
+  function renderMap(worldSize, villages) {
+    const svg = el.mapSvg;
+    svg.setAttribute('viewBox', `0 0 ${worldSize} ${worldSize}`);
+    svg.innerHTML = '';
+
+    const ns = 'http://www.w3.org/2000/svg';
+
+    for (let i = 0; i <= worldSize; i += 5) {
+      const vLine = document.createElementNS(ns, 'line');
+      vLine.setAttribute('x1', i); vLine.setAttribute('y1', 0);
+      vLine.setAttribute('x2', i); vLine.setAttribute('y2', worldSize);
+      vLine.setAttribute('class', 'map-grid-line');
+      svg.appendChild(vLine);
+
+      const hLine = document.createElementNS(ns, 'line');
+      hLine.setAttribute('x1', 0); hLine.setAttribute('y1', i);
+      hLine.setAttribute('x2', worldSize); hLine.setAttribute('y2', i);
+      hLine.setAttribute('class', 'map-grid-line');
+      svg.appendChild(hLine);
+    }
+
+    for (const v of villages) {
+      const dot = document.createElementNS(ns, 'circle');
+      dot.setAttribute('cx', v.x);
+      dot.setAttribute('cy', v.y);
+      dot.setAttribute('r', v.isMine ? 1.3 : 0.9);
+      dot.setAttribute('class', 'map-village-dot ' + (v.isMine ? 'is-mine' : (CIV_CLASS[v.civilization] || 'civ-roma')));
+      dot.addEventListener('click', () => openVillageInfoSheet(v));
+      svg.appendChild(dot);
+
+      if (v.isMine) {
+        const label = document.createElementNS(ns, 'text');
+        label.setAttribute('x', v.x);
+        label.setAttribute('y', v.y - 2);
+        label.setAttribute('class', 'map-village-label');
+        label.textContent = 'Sen';
+        svg.appendChild(label);
+      }
+    }
+  }
+
+  function openVillageInfoSheet(village) {
+    activeMapVillageId = village.id;
+
+    el.villageInfoName.textContent = village.name;
+
+    if (village.isMine) {
+      el.villageInfoOwner.textContent = 'Bu senin köyün';
+      el.villageInfoDetail.textContent = '';
+      el.villageInfoAttackBtn.style.display = 'none';
+    } else {
+      const civName = CIVILIZATION_NAMES[village.civilization] || village.civilization;
+      el.villageInfoOwner.textContent = `Sahip: ${village.ownerName}`;
+      el.villageInfoDetail.textContent = `${civName} · ${village.distance} kare uzaklıkta`;
+      el.villageInfoAttackBtn.style.display = '';
+    }
+
+    el.villageSheetBackdrop.classList.remove('hidden');
+    el.villageInfoSheet.classList.remove('hidden');
+    requestAnimationFrame(() => {
+      el.villageSheetBackdrop.classList.add('show');
+      el.villageInfoSheet.classList.add('show');
+    });
+  }
+
+  function closeVillageInfoSheet() {
+    activeMapVillageId = null;
+    el.villageSheetBackdrop.classList.remove('show');
+    el.villageInfoSheet.classList.remove('show');
+    setTimeout(() => {
+      el.villageSheetBackdrop.classList.add('hidden');
+      el.villageInfoSheet.classList.add('hidden');
+    }, 250);
+  }
+
+  el.villageSheetClose.addEventListener('click', closeVillageInfoSheet);
+  el.villageSheetBackdrop.addEventListener('click', closeVillageInfoSheet);
+
+  el.villageInfoAttackBtn.addEventListener('click', () => {
+    const village = mapVillages.find((v) => v.id === activeMapVillageId);
+    if (!village) return;
+    const target = village.ownerUsername || String(village.ownerTelegramId);
+
+    closeVillageInfoSheet();
+
+    document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+    document.querySelector('.tab-btn[data-tab="attack"]').classList.add('active');
+    state.activeTab = 'attack';
+    el.viewVillage.hidden = true;
+    el.viewMap.hidden = true;
+    el.viewMilitary.hidden = true;
+    el.viewAttack.hidden = false;
+    el.viewPlaceholder.hidden = true;
+
+    renderAttack();
+    fetchReports();
+    el.attackTargetInput.value = target;
+  });
+
+  // ---------------------------------------------------------
   // ALT SEKMELER (TAB BAR)
   // ---------------------------------------------------------
 
@@ -587,6 +714,7 @@
     state.activeTab = tab;
 
     el.viewVillage.hidden = tab !== 'village';
+    el.viewMap.hidden = tab !== 'map';
     el.viewMilitary.hidden = tab !== 'military';
     el.viewAttack.hidden = tab !== 'attack';
     el.viewPlaceholder.hidden = tab !== 'market';
@@ -594,6 +722,7 @@
     if (tab === 'market') {
       el.placeholderText.textContent = "Pazar ve kaynak takası Aşama 6'da eklenecek.";
     }
+    if (tab === 'map') fetchMap();
     if (tab === 'military') renderMilitary();
     if (tab === 'attack') { renderAttack(); fetchReports(); }
   });

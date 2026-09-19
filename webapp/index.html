@@ -191,6 +191,12 @@
     </div>
   </main>
 
+  <main id="view-map" hidden>
+    <div id="map-scene">
+      <svg id="map-svg" viewBox="0 0 50 50" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </main>
+
   <main id="view-military" hidden>
     <div class="panel-scroll">
       <section class="mini-section">
@@ -230,6 +236,7 @@
 
   <nav id="tab-bar">
     <button class="tab-btn active" data-tab="village">Köyüm</button>
+    <button class="tab-btn" data-tab="map">Harita</button>
     <button class="tab-btn" data-tab="military">Askeriye</button>
     <button class="tab-btn" data-tab="market">Pazar</button>
     <button class="tab-btn" data-tab="attack">Saldır</button>
@@ -283,6 +290,19 @@
   </div>
 
   <button id="sheet-upgrade-btn" class="upgrade-btn">Yükselt</button>
+</div>
+
+<!-- ===== HARITA: KOY BILGI PANELI ===== -->
+<div id="village-sheet-backdrop" class="hidden"></div>
+<div id="village-info-sheet" class="hidden">
+  <div class="sheet-handle"></div>
+  <button id="village-sheet-close" aria-label="Kapat">
+    <svg><use href="#icon-close" /></svg>
+  </button>
+  <h2 id="village-info-name">Köy</h2>
+  <p id="village-info-owner" class="sheet-cost-label">Sahip</p>
+  <p id="village-info-detail" class="sheet-time">Medeniyet · Mesafe</p>
+  <button id="village-info-attack-btn" class="upgrade-btn">Bu Köye Saldır</button>
 </div>
 
 <script src="app.js"></script>
