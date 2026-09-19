@@ -1,7 +1,7 @@
 // app.js
 // Mini App'in istemci tarafi mantigi. Telegram'dan initData'yi alir,
-// sunucudan koy verisini ceker, koy sahnesini (binalari) cizer, bina
-// tiklamalarini ve yukseltme islemlerini yonetir.
+// sunucudan koy/ordu verisini ceker, koy sahnesini cizer, bina/asker/
+// saldiri islemlerini yonetir.
 
 (function () {
   'use strict';
@@ -20,7 +20,6 @@
   // SABITLER
   // ---------------------------------------------------------
 
-  // Her bina tipinin koy sahnesindeki konumu (yuzde olarak).
   const POSITIONS = {
     main_building: { top: 18, left: 50 },
     woodcutter: { top: 42, left: 16 },
@@ -42,7 +41,6 @@
   };
 
   const RESOURCE_ICON = { wood: 'icon-res-wood', clay: 'icon-res-clay', iron: 'icon-res-iron', grain: 'icon-res-grain' };
-  const RESOURCE_LABEL = { wood: 'Odun', clay: 'Tuğla', iron: 'Demir', grain: 'Tahıl' };
 
   // ---------------------------------------------------------
   // DURUM (STATE)
@@ -51,8 +49,15 @@
   let state = {
     village: null,
     buildings: [],
+    barracksLevel: 1,
+    army: [],
+    unitRoster: [],
+    trainingQueue: [],
+    outgoingAttacks: [],
+    incomingAttacks: [],
+    reports: [],
     activeSheetType: null,
-    countdownTimer: null
+    activeTab: 'village'
   };
 
   // ---------------------------------------------------------
@@ -67,8 +72,12 @@
     toast: document.getElementById('toast'),
     tabBar: document.getElementById('tab-bar'),
     viewVillage: document.getElementById('view-village'),
+    viewMilitary: document.getElementById('view-military'),
+    viewAttack: document.getElementById('view-attack'),
     viewPlaceholder: document.getElementById('view-placeholder'),
     placeholderText: document.getElementById('placeholder-text'),
+    civPicker: document.getElementById('view-civ-picker'),
+    civCards: document.getElementById('civ-cards'),
     sheetBackdrop: document.getElementById('sheet-backdrop'),
     sheet: document.getElementById('building-sheet'),
     sheetIconUse: document.getElementById('sheet-icon-use'),
@@ -82,7 +91,16 @@
     sheetCostChips: document.getElementById('sheet-cost-chips'),
     sheetTime: document.getElementById('sheet-time'),
     sheetUpgradeBtn: document.getElementById('sheet-upgrade-btn'),
-    sheetClose: document.getElementById('sheet-close')
+    sheetClose: document.getElementById('sheet-close'),
+    barracksLevelEl: document.getElementById('barracks-level'),
+    trainingQueueList: document.getElementById('training-queue-list'),
+    unitRosterEl: document.getElementById('unit-roster'),
+    incomingBanner: document.getElementById('incoming-banner'),
+    attackTargetInput: document.getElementById('attack-target'),
+    attackUnitList: document.getElementById('attack-unit-list'),
+    attackSendBtn: document.getElementById('attack-send-btn'),
+    outgoingList: document.getElementById('outgoing-list'),
+    reportsList: document.getElementById('reports-list')
   };
 
   for (const chip of document.querySelectorAll('.res-chip')) {
@@ -109,15 +127,82 @@
     return data;
   }
 
-  async function fetchVillage() {
-    const data = await apiPost('/api/village', {});
+  function applyPayload(data) {
     state.village = data.village;
     state.buildings = data.buildings;
+    state.barracksLevel = data.barracksLevel;
+    state.army = data.army;
+    state.unitRoster = data.unitRoster;
+    state.trainingQueue = data.trainingQueue;
+    state.outgoingAttacks = data.outgoingAttacks;
+    state.incomingAttacks = data.incomingAttacks;
+  }
+
+  async function fetchVillage() {
+    const data = await apiPost('/api/village', {});
+    el.loadingOverlay.classList.add('hidden');
+
+    if (data.needsCivilization) {
+      showCivPicker(data.civilizations);
+      return;
+    }
+
+    hideCivPicker();
+    applyPayload(data);
     render();
   }
 
+  async function fetchReports() {
+    try {
+      const data = await apiPost('/api/reports', {});
+      state.reports = data.reports;
+      renderReports();
+    } catch (err) {
+      // sessiz gec, savas raporlari kritik degil
+    }
+  }
+
   // ---------------------------------------------------------
-  // GORUNTULEME (RENDER)
+  // MEDENIYET SECIM EKRANI
+  // ---------------------------------------------------------
+
+  function showCivPicker(civilizations) {
+    el.civCards.innerHTML = '';
+    for (const civ of civilizations) {
+      const card = document.createElement('div');
+      card.className = 'civ-card';
+      card.innerHTML =
+        `<h3 class="civ-card-name">${civ.name}</h3>` +
+        `<p class="civ-card-tagline">${civ.tagline}</p>` +
+        `<p class="civ-card-desc">${civ.description}</p>`;
+      card.addEventListener('click', () => chooseCivilization(civ.key, card));
+      el.civCards.appendChild(card);
+    }
+    el.civPicker.classList.remove('hidden');
+  }
+
+  function hideCivPicker() {
+    el.civPicker.classList.add('hidden');
+  }
+
+  async function chooseCivilization(key, cardEl) {
+    document.querySelectorAll('.civ-card').forEach((c) => { c.style.pointerEvents = 'none'; });
+    if (cardEl) cardEl.style.opacity = '0.6';
+
+    try {
+      const data = await apiPost('/api/choose-civilization', { civilization: key });
+      hideCivPicker();
+      applyPayload(data);
+      render();
+    } catch (err) {
+      showToast(err.message || 'Medeniyet seçilemedi.');
+      document.querySelectorAll('.civ-card').forEach((c) => { c.style.pointerEvents = ''; });
+      if (cardEl) cardEl.style.opacity = '';
+    }
+  }
+
+  // ---------------------------------------------------------
+  // GENEL GORUNTULEME
   // ---------------------------------------------------------
 
   function render() {
@@ -145,6 +230,9 @@
       const building = state.buildings.find((b) => b.type === state.activeSheetType);
       if (building) renderSheetContent(building);
     }
+
+    if (state.activeTab === 'military') renderMilitary();
+    if (state.activeTab === 'attack') renderAttack();
   }
 
   function renderScene() {
@@ -194,6 +282,12 @@
     return m > 0 ? `${m}dk ${s}sn` : `${s}sn`;
   }
 
+  function formatDuration(totalSec) {
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return m > 0 ? `${m} dk ${s} sn` : `${s} sn`;
+  }
+
   // ---------------------------------------------------------
   // BINA DETAY PANELI (SHEET)
   // ---------------------------------------------------------
@@ -212,16 +306,12 @@
       el.sheetBackdrop.classList.add('show');
       el.sheet.classList.add('show');
     });
-
-    stopCountdown();
-    if (building.upgrading) startCountdown();
   }
 
   function closeSheet() {
     state.activeSheetType = null;
     el.sheetBackdrop.classList.remove('show');
     el.sheet.classList.remove('show');
-    stopCountdown();
     setTimeout(() => {
       if (!state.activeSheetType) {
         el.sheetBackdrop.classList.add('hidden');
@@ -262,12 +352,6 @@
     }
   }
 
-  function formatDuration(totalSec) {
-    const m = Math.floor(totalSec / 60);
-    const s = totalSec % 60;
-    return m > 0 ? `${m} dk ${s} sn` : `${s} sn`;
-  }
-
   function updateCountdownUI(building) {
     const remainingMs = Math.max(0, new Date(building.upgradeFinishesAt).getTime() - Date.now());
     const totalMs = (building.nextTimeSeconds || 1) * 1000;
@@ -277,35 +361,9 @@
     el.sheetCountdown.textContent = `İnşa ediliyor… ${formatRemaining(building.upgradeFinishesAt)} kaldı`;
 
     if (remainingMs <= 0) {
-      stopCountdown();
       fetchVillage().catch(showApiError);
     }
   }
-
-  function startCountdown() {
-    state.countdownTimer = setInterval(() => {
-      // Sahnedeki zamanlayici etiketlerini guncelle
-      document.querySelectorAll('.marker-timer').forEach((elm) => {
-        elm.textContent = formatRemaining(elm.dataset.finishesAt);
-      });
-
-      if (state.activeSheetType) {
-        const building = state.buildings.find((b) => b.type === state.activeSheetType);
-        if (building && building.upgrading) updateCountdownUI(building);
-      }
-    }, 1000);
-  }
-
-  function stopCountdown() {
-    if (state.countdownTimer) {
-      clearInterval(state.countdownTimer);
-      state.countdownTimer = null;
-    }
-  }
-
-  // ---------------------------------------------------------
-  // YUKSELTME ISLEMI
-  // ---------------------------------------------------------
 
   el.sheetUpgradeBtn.addEventListener('click', async () => {
     const type = state.activeSheetType;
@@ -316,15 +374,11 @@
 
     try {
       const data = await apiPost('/api/upgrade', { type });
-      state.village = data.village;
-      state.buildings = data.buildings;
+      applyPayload(data);
       render();
       showToast('İnşaat başladı!');
       const building = state.buildings.find((b) => b.type === type);
-      if (building) {
-        renderSheetContent(building);
-        startCountdown();
-      }
+      if (building) renderSheetContent(building);
     } catch (err) {
       el.sheetUpgradeBtn.disabled = false;
       const building = state.buildings.find((b) => b.type === type);
@@ -337,14 +391,190 @@
   el.sheetBackdrop.addEventListener('click', closeSheet);
 
   // ---------------------------------------------------------
-  // ALT SEKMELER (TAB BAR)
+  // ASKERIYE (KISLA)
   // ---------------------------------------------------------
 
-  const TAB_MESSAGES = {
-    military: 'Askeriye ve asker üretimi Aşama 3\'te eklenecek.',
-    market: 'Pazar ve kaynak takası Aşama 4\'te eklenecek.',
-    attack: 'Saldırı ve yağma sistemi Aşama 3\'te eklenecek.'
-  };
+  function renderMilitary() {
+    el.barracksLevelEl.textContent = state.barracksLevel;
+
+    el.trainingQueueList.innerHTML = '';
+    if (state.trainingQueue.length === 0) {
+      el.trainingQueueList.innerHTML = '<p class="queue-empty">Eğitimde birlik yok.</p>';
+    } else {
+      for (const q of state.trainingQueue) {
+        const row = document.createElement('div');
+        row.className = 'queue-item';
+        row.innerHTML =
+          `<span>${q.quantity}x ${q.unitName}</span>` +
+          `<span class="queue-timer" data-finishes-at="${q.finishesAt}">${formatRemaining(q.finishesAt)}</span>`;
+        el.trainingQueueList.appendChild(row);
+      }
+    }
+
+    el.unitRosterEl.innerHTML = '';
+    for (const unit of state.unitRoster) {
+      const card = document.createElement('div');
+      card.className = 'unit-card';
+
+      const costChips = ['wood', 'clay', 'iron', 'grain']
+        .filter((k) => unit.cost[k] > 0)
+        .map((k) => `<div class="cost-chip"><svg><use href="#${RESOURCE_ICON[k]}"/></svg><span>${unit.cost[k]}</span></div>`)
+        .join('');
+
+      card.innerHTML =
+        `<div class="unit-card-top">` +
+        `<svg class="unit-role-icon"><use href="#icon-role-${unit.role}"/></svg>` +
+        `<span class="unit-card-name">${unit.name}</span>` +
+        `<span class="unit-card-owned">${unit.owned} adet</span>` +
+        `</div>` +
+        `<div class="unit-stats"><span>Atk ${unit.attack}</span><span>Sav ${unit.defense}</span><span>Taş ${unit.carry}</span><span>${unit.upkeep} tahıl/sa</span></div>` +
+        `<div class="unit-card-costs">${costChips}</div>` +
+        `<div class="unit-train-row">` +
+        `<input type="number" class="qty-input" min="1" value="1" data-unit="${unit.type}" />` +
+        `<button class="train-btn" data-unit="${unit.type}">Eğit (${formatDuration(unit.trainTimeSeconds)}/adet)</button>` +
+        `</div>`;
+
+      el.unitRosterEl.appendChild(card);
+    }
+
+    el.unitRosterEl.querySelectorAll('.train-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const type = btn.dataset.unit;
+        const input = el.unitRosterEl.querySelector(`.qty-input[data-unit="${type}"]`);
+        const quantity = Math.max(1, parseInt(input.value, 10) || 1);
+
+        btn.disabled = true;
+        const original = btn.textContent;
+        btn.textContent = 'Başlatılıyor…';
+
+        try {
+          const data = await apiPost('/api/train', { unitType: type, quantity });
+          applyPayload(data);
+          render();
+          showToast('Eğitim başladı!');
+        } catch (err) {
+          showToast(err.message || 'Eğitim başlatılamadı.');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = original;
+        }
+      });
+    });
+  }
+
+  // ---------------------------------------------------------
+  // SALDIRI
+  // ---------------------------------------------------------
+
+  function renderAttack() {
+    if (state.incomingAttacks.length > 0) {
+      const soonest = state.incomingAttacks[0];
+      el.incomingBanner.dataset.finishesAt = soonest.arrivesAt;
+      el.incomingBanner.textContent = `⚠ Gelen saldırı! Varış: ${formatRemaining(soonest.arrivesAt)}`;
+      el.incomingBanner.classList.remove('hidden');
+    } else {
+      el.incomingBanner.classList.add('hidden');
+      delete el.incomingBanner.dataset.finishesAt;
+    }
+
+    el.outgoingList.innerHTML = '';
+    if (state.outgoingAttacks.length === 0) {
+      el.outgoingList.innerHTML = '<p class="queue-empty">Yolda saldırın yok.</p>';
+    } else {
+      for (const a of state.outgoingAttacks) {
+        const row = document.createElement('div');
+        row.className = 'queue-item';
+        row.innerHTML =
+          `<span>Saldırı yolda</span>` +
+          `<span class="queue-timer" data-finishes-at="${a.arrivesAt}">${formatRemaining(a.arrivesAt)}</span>`;
+        el.outgoingList.appendChild(row);
+      }
+    }
+
+    el.attackUnitList.innerHTML = '';
+    if (state.army.length === 0) {
+      el.attackUnitList.innerHTML = '<p class="queue-empty">Saldırabileceğin birliğin yok. Önce Askeriye\'den asker eğit.</p>';
+    } else {
+      for (const u of state.army) {
+        const roster = state.unitRoster.find((r) => r.type === u.type);
+        const row = document.createElement('div');
+        row.className = 'unit-select-row';
+        row.innerHTML =
+          `<svg class="unit-role-icon"><use href="#icon-role-${roster ? roster.role : 'attack'}"/></svg>` +
+          `<span class="unit-select-name">${u.name}</span>` +
+          `<span class="unit-select-owned">${u.count} adet</span>` +
+          `<input type="number" class="qty-input" min="0" max="${u.count}" value="0" data-unit="${u.type}" />`;
+        el.attackUnitList.appendChild(row);
+      }
+    }
+  }
+
+  function renderReports() {
+    el.reportsList.innerHTML = '';
+    if (state.reports.length === 0) {
+      el.reportsList.innerHTML = '<p class="queue-empty">Henüz savaş raporu yok.</p>';
+      return;
+    }
+
+    for (const r of state.reports) {
+      const item = document.createElement('div');
+      item.className = 'report-item ' + (r.won ? 'won' : 'lost');
+
+      const roleLabel = r.role === 'attacker' ? 'Sen saldırdın' : 'Sana saldırıldı';
+      const resultLabel = r.won
+        ? (r.role === 'attacker' ? 'Kazandın' : 'Savundun')
+        : (r.role === 'attacker' ? 'Kaybettin' : 'Yenildin');
+      const lootText = (r.won && r.role === 'attacker')
+        ? `Yağma: Odun ${r.loot.wood}, Tuğla ${r.loot.clay}, Demir ${r.loot.iron}, Tahıl ${r.loot.grain}`
+        : (r.role === 'attacker' ? 'Birlikleriniz kayboldu.' : (r.won ? 'Saldırı püskürtüldü.' : 'Köyün yağmalandı.'));
+
+      item.innerHTML =
+        `<div class="report-top"><span>${roleLabel} — ${r.opponentName}</span><span>${resultLabel}</span></div>` +
+        `<div class="report-detail">${r.opponentVillage} · ${lootText}</div>`;
+
+      el.reportsList.appendChild(item);
+    }
+  }
+
+  el.attackSendBtn.addEventListener('click', async () => {
+    const target = el.attackTargetInput.value.trim();
+    if (!target) {
+      showToast('Hedef kullanıcı adı ya da Telegram ID gir.');
+      return;
+    }
+
+    const units = {};
+    el.attackUnitList.querySelectorAll('.qty-input').forEach((input) => {
+      const n = parseInt(input.value, 10) || 0;
+      if (n > 0) units[input.dataset.unit] = n;
+    });
+
+    if (Object.keys(units).length === 0) {
+      showToast('En az bir birlik seç.');
+      return;
+    }
+
+    el.attackSendBtn.disabled = true;
+    el.attackSendBtn.textContent = 'Gönderiliyor…';
+
+    try {
+      const data = await apiPost('/api/attack', { target, units });
+      applyPayload(data);
+      render();
+      showToast(`Saldırı gönderildi! Varış: ${formatDuration(data.travelSeconds)}`);
+      el.attackTargetInput.value = '';
+      fetchReports();
+    } catch (err) {
+      showToast(err.message || 'Saldırı gönderilemedi.');
+    } finally {
+      el.attackSendBtn.disabled = false;
+      el.attackSendBtn.textContent = 'Saldırıya Gönder';
+    }
+  });
+
+  // ---------------------------------------------------------
+  // ALT SEKMELER (TAB BAR)
+  // ---------------------------------------------------------
 
   el.tabBar.addEventListener('click', (event) => {
     const btn = event.target.closest('.tab-btn');
@@ -354,14 +584,18 @@
     btn.classList.add('active');
 
     const tab = btn.dataset.tab;
-    if (tab === 'village') {
-      el.viewVillage.hidden = false;
-      el.viewPlaceholder.hidden = true;
-    } else {
-      el.viewVillage.hidden = true;
-      el.viewPlaceholder.hidden = false;
-      el.placeholderText.textContent = TAB_MESSAGES[tab] || 'Bu özellik yakında eklenecek.';
+    state.activeTab = tab;
+
+    el.viewVillage.hidden = tab !== 'village';
+    el.viewMilitary.hidden = tab !== 'military';
+    el.viewAttack.hidden = tab !== 'attack';
+    el.viewPlaceholder.hidden = tab !== 'market';
+
+    if (tab === 'market') {
+      el.placeholderText.textContent = "Pazar ve kaynak takası Aşama 6'da eklenecek.";
     }
+    if (tab === 'military') renderMilitary();
+    if (tab === 'attack') { renderAttack(); fetchReports(); }
   });
 
   // ---------------------------------------------------------
@@ -386,6 +620,27 @@
   }
 
   // ---------------------------------------------------------
+  // CANLI GERI SAYIMLAR (her saniye)
+  // ---------------------------------------------------------
+
+  function tickTimers() {
+    document.querySelectorAll('.marker-timer[data-finishes-at]').forEach((elm) => {
+      elm.textContent = formatRemaining(elm.dataset.finishesAt);
+    });
+    document.querySelectorAll('.queue-timer[data-finishes-at]').forEach((elm) => {
+      elm.textContent = formatRemaining(elm.dataset.finishesAt);
+    });
+    if (el.incomingBanner.dataset.finishesAt && !el.incomingBanner.classList.contains('hidden')) {
+      el.incomingBanner.textContent = `⚠ Gelen saldırı! Varış: ${formatRemaining(el.incomingBanner.dataset.finishesAt)}`;
+    }
+    if (state.activeSheetType) {
+      const building = state.buildings.find((b) => b.type === state.activeSheetType);
+      if (building && building.upgrading) updateCountdownUI(building);
+    }
+  }
+  setInterval(tickTimers, 1000);
+
+  // ---------------------------------------------------------
   // BASLANGIC
   // ---------------------------------------------------------
 
@@ -397,14 +652,13 @@
 
     try {
       await fetchVillage();
-      el.loadingOverlay.classList.add('hidden');
     } catch (err) {
       el.loadingText.textContent = err.message || 'Köy yüklenemedi. Önce botta /start yapmalısın.';
     }
   }
 
-  // Arka planda periyodik yenileme: sunucu tarafinda zaten saatlik uretim
-  // hesaplaniyor, burada sadece ekrani guncel tutuyoruz.
+  // Arka planda periyodik yenileme: sunucu tarafinda zaten uretim/insaat/
+  // saldiri hesaplaniyor, burada sadece ekrani guncel tutuyoruz.
   setInterval(() => {
     if (state.village) fetchVillage().catch(() => {});
   }, 15000);

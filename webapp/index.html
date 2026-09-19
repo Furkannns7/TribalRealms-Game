@@ -132,6 +132,28 @@
     <line x1="19" y1="5" x2="5" y2="19" />
   </symbol>
 
+  <symbol id="icon-role-attack" viewBox="0 0 32 32">
+    <line x1="7" y1="25" x2="25" y2="7" class="ic-blade-line" />
+    <line x1="11" y1="21" x2="16" y2="16" class="ic-handle" />
+    <circle cx="7" cy="25" r="2.6" class="ic-pommel" />
+  </symbol>
+
+  <symbol id="icon-role-defense" viewBox="0 0 32 32">
+    <path d="M16 4 L27 8 V16 C27 23 22 28 16 30 C10 28 5 23 5 16 V8 Z" class="ic-shield" />
+    <line x1="16" y1="10" x2="16" y2="22" class="ic-shield-cross" />
+    <line x1="10" y1="14" x2="22" y2="14" class="ic-shield-cross" />
+  </symbol>
+
+  <symbol id="icon-role-raid" viewBox="0 0 32 32">
+    <path d="M9 27 C6 22 6 10 16 8 C26 10 26 22 23 27" class="ic-horseshoe" />
+    <circle cx="9" cy="27" r="1.7" class="ic-horseshoe-nail" />
+    <circle cx="23" cy="27" r="1.7" class="ic-horseshoe-nail" />
+  </symbol>
+
+  <symbol id="icon-shield-small" viewBox="0 0 32 32">
+    <path d="M16 4 L27 8 V16 C27 23 22 28 16 30 C10 28 5 23 5 16 V8 Z" class="ic-shield" />
+  </symbol>
+
 </defs>
 </svg>
 
@@ -169,6 +191,36 @@
     </div>
   </main>
 
+  <main id="view-military" hidden>
+    <div class="panel-scroll">
+      <section class="mini-section">
+        <h2 class="mini-heading">Kışla — Seviye <span id="barracks-level">1</span></h2>
+        <div id="training-queue-list" class="queue-list"></div>
+      </section>
+      <section class="mini-section">
+        <h2 class="mini-heading">Birlik Eğit</h2>
+        <div id="unit-roster" class="unit-roster"></div>
+      </section>
+    </div>
+  </main>
+
+  <main id="view-attack" hidden>
+    <div class="panel-scroll">
+      <section class="mini-section">
+        <div id="incoming-banner" class="incoming-banner hidden"></div>
+        <h2 class="mini-heading">Saldırı Gönder</h2>
+        <input id="attack-target" type="text" placeholder="Kullanıcı adı veya Telegram ID" class="text-input" autocomplete="off" />
+        <div id="attack-unit-list" class="unit-select-list"></div>
+        <button id="attack-send-btn" class="upgrade-btn">Saldırıya Gönder</button>
+        <div id="outgoing-list" class="queue-list"></div>
+      </section>
+      <section class="mini-section">
+        <h2 class="mini-heading">Savaş Raporları</h2>
+        <div id="reports-list" class="reports-list"></div>
+      </section>
+    </div>
+  </main>
+
   <main id="view-placeholder" hidden>
     <div class="placeholder-card">
       <svg class="placeholder-icon"><use href="#icon-hammer" /></svg>
@@ -190,6 +242,15 @@
 
   <div id="toast" class="hidden"></div>
 
+</div>
+
+<!-- ===== MEDENIYET SECIM EKRANI (ilk acilista, koy olusana kadar) ===== -->
+<div id="view-civ-picker" class="hidden">
+  <div class="civ-picker">
+    <h1 class="civ-title">Bir Medeniyet Seç</h1>
+    <p class="civ-subtitle">Bu seçim kalıcıdır ve hangi birlikleri eğitebileceğini belirler.</p>
+    <div id="civ-cards" class="civ-cards"><!-- app.js tarafindan doldurulur --></div>
+  </div>
 </div>
 
 <!-- ===== BINA DETAY PANELI (alt sayfa) ===== -->

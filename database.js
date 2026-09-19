@@ -13,9 +13,15 @@ const db = new DatabaseSync(path.join(__dirname, 'game.db'));
 // WAL modu: ayni anda cok sayida okuma/yazma oldugunda performansi artirir.
 db.exec('PRAGMA journal_mode = WAL');
 
+function columnExists(table, column) {
+  const rows = db.prepare(`PRAGMA table_info(${table})`).all();
+  return rows.some((r) => r.name === column);
+}
+
 function initDatabase() {
   // ---- USERS TABLOSU ----
-  // Her Telegram kullanicisi icin bir kayit tutar.
+  // Her Telegram kullanicisi icin bir kayit tutar. "civilization" Asama 3'te
+  // eklendi: oyuncu ilk kez koy kurarken sectigi medeniyet (roma/galya/toton).
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,18 +29,21 @@ function initDatabase() {
       username TEXT,
       first_name TEXT,
       gold INTEGER DEFAULT 0,
+      civilization TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
   // ---- VILLAGES TABLOSU ----
-  // Her oyuncunun (simdilik) bir koyu var. Ileride bir kullaniciya birden
-  // fazla koy eklemek istersen, user_id iliskisi buna zaten uygun.
+  // "x" ve "y": koyun dunya haritasindaki konumu (Asama 5'te kullanilacak,
+  // simdilik saldiri mesafesi/seyahat suresi hesabi icin kullaniliyor).
   db.exec(`
     CREATE TABLE IF NOT EXISTS villages (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       name TEXT NOT NULL,
+      x INTEGER,
+      y INTEGER,
       wood INTEGER DEFAULT 500,
       clay INTEGER DEFAULT 500,
       iron INTEGER DEFAULT 500,
@@ -52,8 +61,6 @@ function initDatabase() {
   `);
 
   // ---- BUILDINGS TABLOSU ----
-  // "upgrading" ve "upgrade_finishes_at", Asama 2'de eklenen bina yukseltme
-  // (insaat) sistemi icin kullanilir.
   db.exec(`
     CREATE TABLE IF NOT EXISTS buildings (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,22 +73,100 @@ function initDatabase() {
     )
   `);
 
-  // ---- MIGRATION (Asama 1'de olusturulmus eski veritabanlari icin) ----
-  // Eger "game.db" dosyan Asama 1'den kaldiysa, buildings tablosunda
-  // upgrading/upgrade_finishes_at sutunlari olmayabilir. Asagidaki kod bu
-  // sutunlari (yoksa) sessizce ekler; zaten varsa hatayi yoksayar.
-  try {
-    db.exec('ALTER TABLE buildings ADD COLUMN upgrading INTEGER DEFAULT 0');
-  } catch (err) {
-    // Sutun zaten var; sorun degil.
+  // ---- ARMY TABLOSU (Asama 3) ----
+  // Bir koydeki her birim tipinden kac adet oldugunu tutar.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS army (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      village_id INTEGER NOT NULL,
+      unit_type TEXT NOT NULL,
+      count INTEGER DEFAULT 0,
+      UNIQUE(village_id, unit_type),
+      FOREIGN KEY (village_id) REFERENCES villages(id)
+    )
+  `);
+
+  // ---- TRAINING_QUEUE TABLOSU (Asama 3) ----
+  // Kislada egitilmekte olan asker siparislerini tutar (sirayla tamamlanir).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS training_queue (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      village_id INTEGER NOT NULL,
+      unit_type TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      finishes_at DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (village_id) REFERENCES villages(id)
+    )
+  `);
+
+  // ---- ATTACKS TABLOSU (Asama 4) ----
+  // Yolda olan (henuz varmamis) saldirilari tutar.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS attacks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      attacker_village_id INTEGER NOT NULL,
+      defender_village_id INTEGER NOT NULL,
+      units TEXT NOT NULL,
+      arrives_at DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (attacker_village_id) REFERENCES villages(id),
+      FOREIGN KEY (defender_village_id) REFERENCES villages(id)
+    )
+  `);
+
+  // ---- BATTLE_REPORTS TABLOSU (Asama 4) ----
+  // Sonuclanmis saldirilarin kalici loglari ("yagmalama sonucu loglar").
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS battle_reports (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      attacker_village_id INTEGER NOT NULL,
+      defender_village_id INTEGER NOT NULL,
+      attacker_user_id INTEGER NOT NULL,
+      defender_user_id INTEGER NOT NULL,
+      outcome TEXT NOT NULL,
+      units_sent TEXT NOT NULL,
+      attacker_losses TEXT NOT NULL,
+      defender_losses TEXT NOT NULL,
+      loot TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // ---- MIGRATION (onceki asamalardan kalma eski game.db dosyalari icin) ----
+  // Asagidaki ALTER'lar sutun zaten varsa sessizce hata verir, o hata yoksayilir.
+  try { db.exec('ALTER TABLE buildings ADD COLUMN upgrading INTEGER DEFAULT 0'); } catch (err) {}
+  try { db.exec('ALTER TABLE buildings ADD COLUMN upgrade_finishes_at DATETIME'); } catch (err) {}
+  try { db.exec('ALTER TABLE users ADD COLUMN civilization TEXT'); } catch (err) {}
+  try { db.exec('ALTER TABLE villages ADD COLUMN x INTEGER'); } catch (err) {}
+  try { db.exec('ALTER TABLE villages ADD COLUMN y INTEGER'); } catch (err) {}
+
+  // Eski test hesaplarina (Asama 1-2'den kalma) varsayilan medeniyet ata,
+  // yoksa mini app'te takilip kalirlar.
+  db.exec(`
+    UPDATE users SET civilization = 'roma'
+    WHERE civilization IS NULL
+      AND id IN (SELECT user_id FROM villages)
+  `);
+
+  // Eski koylere (x/y olmayan) rastgele koordinat ata.
+  const villagesWithoutCoords = db.prepare('SELECT id FROM villages WHERE x IS NULL OR y IS NULL').all();
+  const assignCoords = db.prepare('UPDATE villages SET x = ?, y = ? WHERE id = ?');
+  for (const v of villagesWithoutCoords) {
+    assignCoords.run(Math.floor(Math.random() * 50), Math.floor(Math.random() * 50), v.id);
   }
-  try {
-    db.exec('ALTER TABLE buildings ADD COLUMN upgrade_finishes_at DATETIME');
-  } catch (err) {
-    // Sutun zaten var; sorun degil.
+
+  // Eski koylere (Asama 3'ten once olusturulmus) kisla ekle.
+  const villagesWithoutBarracks = db.prepare(`
+    SELECT v.id FROM villages v
+    WHERE NOT EXISTS (SELECT 1 FROM buildings b WHERE b.village_id = v.id AND b.type = 'barracks')
+  `).all();
+  const insertBarracks = db.prepare('INSERT INTO buildings (village_id, type, level) VALUES (?, ?, 1)');
+  for (const v of villagesWithoutBarracks) {
+    insertBarracks.run(v.id, 'barracks');
   }
 
   console.log('Veritabani tablolari hazir.');
 }
 
-module.exports = { db, initDatabase };
+module.exports = { db, initDatabase, columnExists };
