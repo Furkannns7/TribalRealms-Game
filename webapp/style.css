@@ -232,21 +232,28 @@ html, body {
 
 #tab-bar {
   display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
   background: var(--parchment);
   border-top: 3px solid var(--wood-mid);
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+#tab-bar::-webkit-scrollbar { display: none; }
+
 .tab-btn {
-  flex: 1;
+  flex: 0 0 auto;
+  min-width: 60px;
   border: none;
   background: none;
   font-family: var(--font-body);
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: var(--ink-soft);
-  padding: 12px 4px 10px;
+  padding: 12px 10px 10px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .tab-btn.active {
@@ -979,6 +986,129 @@ html, body {
   font-size: 19px;
   margin: 10px 0 4px;
 }
+
+/* ---------- Sohbet ---------- */
+
+#view-chat {
+  flex: 1;
+  min-height: 0;
+  padding: 0 10px 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+#chat-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--parchment);
+  border-radius: 16px 16px 0 0;
+  padding: 10px 10px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-msg { max-width: 78%; display: flex; flex-direction: column; }
+.chat-msg.mine { align-self: flex-end; align-items: flex-end; }
+.chat-msg.theirs { align-self: flex-start; align-items: flex-start; }
+
+.chat-sender {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  margin: 0 4px 2px;
+}
+
+.chat-bubble {
+  border-radius: 12px;
+  padding: 7px 11px;
+  font-size: 13px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.chat-msg.theirs .chat-bubble { background: var(--parchment-dark); border-bottom-left-radius: 3px; }
+.chat-msg.mine .chat-bubble { background: var(--roof-red); color: var(--parchment); border-bottom-right-radius: 3px; }
+
+.chat-time {
+  font-size: 9.5px;
+  color: var(--ink-soft);
+  margin: 2px 4px 0;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: var(--parchment);
+  border-radius: 0 0 16px 16px;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  border-top: 2px solid var(--parchment-dark);
+}
+
+.chat-input-row .text-input { margin-bottom: 0; flex: 1; }
+
+.chat-send-btn {
+  border: none;
+  border-radius: 10px;
+  background: var(--roof-red);
+  color: var(--parchment);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 0 16px;
+  height: 40px;
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--roof-red-dark);
+}
+
+.chat-send-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--roof-red-dark); }
+.chat-send-btn:disabled { background: var(--stone); box-shadow: 0 2px 0 var(--stone-dark); }
+
+/* ---------- Pazar: takas formu ---------- */
+
+.trade-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.trade-col { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+
+.trade-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.select-input {
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+.offer-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.offer-item .offer-text { font-size: 12.5px; font-weight: 600; flex: 1; }
+.offer-item .offer-from { font-size: 10.5px; color: var(--ink-soft); display: block; font-weight: 400; margin-top: 2px; }
+
+.offer-action-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.offer-action-btn.accept { background: var(--roof-red); color: var(--parchment); }
+.offer-action-btn.cancel { background: var(--stone); color: var(--parchment); }
 
 
 @media (min-width: 480px) {

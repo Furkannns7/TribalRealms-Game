@@ -210,6 +210,56 @@
     </div>
   </main>
 
+  <main id="view-market" hidden>
+    <div class="panel-scroll">
+      <section class="mini-section">
+        <h2 class="mini-heading">Yeni Teklif — Pazar Sv.<span id="market-level">1</span></h2>
+        <p id="market-slots" class="queue-empty"></p>
+        <div class="trade-row">
+          <div class="trade-col">
+            <label class="trade-label">Veriyorum</label>
+            <select id="offer-resource" class="text-input select-input">
+              <option value="wood">Odun</option>
+              <option value="clay">Tuğla</option>
+              <option value="iron">Demir</option>
+              <option value="grain">Tahıl</option>
+            </select>
+            <input id="offer-amount" type="number" min="1" value="100" class="text-input" />
+          </div>
+          <div class="trade-col">
+            <label class="trade-label">İstiyorum</label>
+            <select id="request-resource" class="text-input select-input">
+              <option value="clay">Tuğla</option>
+              <option value="wood">Odun</option>
+              <option value="iron">Demir</option>
+              <option value="grain">Tahıl</option>
+            </select>
+            <input id="request-amount" type="number" min="1" value="100" class="text-input" />
+          </div>
+        </div>
+        <button id="market-create-btn" class="upgrade-btn">Teklif Oluştur</button>
+      </section>
+
+      <section class="mini-section">
+        <h2 class="mini-heading">Tekliflerim</h2>
+        <div id="my-offers-list" class="queue-list"></div>
+      </section>
+
+      <section class="mini-section">
+        <h2 class="mini-heading">Piyasa</h2>
+        <div id="market-offers-list" class="reports-list"></div>
+      </section>
+    </div>
+  </main>
+
+  <main id="view-chat" hidden>
+    <div id="chat-messages"></div>
+    <div class="chat-input-row">
+      <input id="chat-input" type="text" class="text-input" placeholder="Mesaj yaz…" maxlength="300" autocomplete="off" />
+      <button id="chat-send-btn" class="chat-send-btn">Gönder</button>
+    </div>
+  </main>
+
   <main id="view-attack" hidden>
     <div class="panel-scroll">
       <section class="mini-section">
@@ -239,6 +289,7 @@
     <button class="tab-btn" data-tab="map">Harita</button>
     <button class="tab-btn" data-tab="military">Askeriye</button>
     <button class="tab-btn" data-tab="market">Pazar</button>
+    <button class="tab-btn" data-tab="chat">Sohbet</button>
     <button class="tab-btn" data-tab="attack">Saldır</button>
   </nav>
 

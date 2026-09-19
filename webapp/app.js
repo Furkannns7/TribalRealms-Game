@@ -41,6 +41,7 @@
   };
 
   const RESOURCE_ICON = { wood: 'icon-res-wood', clay: 'icon-res-clay', iron: 'icon-res-iron', grain: 'icon-res-grain' };
+  const RESOURCE_LABEL = { wood: 'Odun', clay: 'Tuğla', iron: 'Demir', grain: 'Tahıl' };
   const CIVILIZATION_NAMES = { roma: 'Roma', galya: 'Galya', toton: 'Töton' };
 
   // ---------------------------------------------------------
@@ -57,6 +58,10 @@
     outgoingAttacks: [],
     incomingAttacks: [],
     reports: [],
+    marketLevel: 1,
+    myOffers: [],
+    marketOffers: [],
+    chatMessages: [],
     activeSheetType: null,
     activeTab: 'village'
   };
@@ -76,7 +81,21 @@
     viewMap: document.getElementById('view-map'),
     mapSvg: document.getElementById('map-svg'),
     viewMilitary: document.getElementById('view-military'),
+    viewMarket: document.getElementById('view-market'),
+    marketLevelEl: document.getElementById('market-level'),
+    marketSlotsEl: document.getElementById('market-slots'),
+    offerResourceSelect: document.getElementById('offer-resource'),
+    offerAmountInput: document.getElementById('offer-amount'),
+    requestResourceSelect: document.getElementById('request-resource'),
+    requestAmountInput: document.getElementById('request-amount'),
+    marketCreateBtn: document.getElementById('market-create-btn'),
+    myOffersList: document.getElementById('my-offers-list'),
+    marketOffersList: document.getElementById('market-offers-list'),
     viewAttack: document.getElementById('view-attack'),
+    viewChat: document.getElementById('view-chat'),
+    chatMessagesEl: document.getElementById('chat-messages'),
+    chatInput: document.getElementById('chat-input'),
+    chatSendBtn: document.getElementById('chat-send-btn'),
     viewPlaceholder: document.getElementById('view-placeholder'),
     placeholderText: document.getElementById('placeholder-text'),
     civPicker: document.getElementById('view-civ-picker'),
@@ -219,21 +238,7 @@
     if (!state.village) return;
 
     el.villageName.textContent = state.village.name;
-
-    const resources = {
-      wood: [state.village.wood, state.village.woodProduction],
-      clay: [state.village.clay, state.village.clayProduction],
-      iron: [state.village.iron, state.village.ironProduction],
-      grain: [state.village.grain, state.village.grainProduction]
-    };
-
-    for (const chip of document.querySelectorAll('.res-chip')) {
-      const key = chip.dataset.res;
-      const [amount, rate] = resources[key];
-      chip.amountEl.textContent = Math.floor(amount);
-      chip.rateEl.textContent = `+${rate}/sa`;
-    }
-
+    updateResourceBar();
     renderScene();
 
     if (state.activeSheetType) {
@@ -242,6 +247,7 @@
     }
 
     if (state.activeTab === 'military') renderMilitary();
+    if (state.activeTab === 'market') fetchMarket();
     if (state.activeTab === 'attack') renderAttack();
   }
 
@@ -583,6 +589,235 @@
   });
 
   // ---------------------------------------------------------
+  // SOHBET
+  // ---------------------------------------------------------
+
+  let chatPollTimer = null;
+
+  function startChatPolling() {
+    stopChatPolling();
+    chatPollTimer = setInterval(fetchChat, 4000);
+  }
+
+  function stopChatPolling() {
+    if (chatPollTimer) {
+      clearInterval(chatPollTimer);
+      chatPollTimer = null;
+    }
+  }
+
+  async function fetchChat() {
+    try {
+      const data = await apiPost('/api/chat', {});
+      state.chatMessages = data.messages;
+      renderChat();
+    } catch (err) {
+      // sessiz gec, sohbet kritik degil
+    }
+  }
+
+  function formatClock(iso) {
+    const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z');
+    return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function renderChat() {
+    el.chatMessagesEl.innerHTML = '';
+
+    for (const m of state.chatMessages) {
+      const row = document.createElement('div');
+      row.className = 'chat-msg ' + (m.isMine ? 'mine' : 'theirs');
+
+      if (!m.isMine) {
+        const sender = document.createElement('span');
+        sender.className = 'chat-sender';
+        sender.textContent = m.senderName;
+        row.appendChild(sender);
+      }
+
+      const bubble = document.createElement('div');
+      bubble.className = 'chat-bubble';
+      bubble.textContent = m.message; // textContent kullanilir, HTML olarak yorumlanmaz (guvenlik)
+      row.appendChild(bubble);
+
+      const time = document.createElement('span');
+      time.className = 'chat-time';
+      time.textContent = formatClock(m.createdAt);
+      row.appendChild(time);
+
+      el.chatMessagesEl.appendChild(row);
+    }
+
+    el.chatMessagesEl.scrollTop = el.chatMessagesEl.scrollHeight;
+  }
+
+  async function sendChatMessage() {
+    const text = el.chatInput.value.trim();
+    if (!text) return;
+
+    el.chatSendBtn.disabled = true;
+    el.chatInput.disabled = true;
+
+    try {
+      const data = await apiPost('/api/chat/send', { message: text });
+      state.chatMessages = data.messages;
+      renderChat();
+      el.chatInput.value = '';
+    } catch (err) {
+      showToast(err.message || 'Mesaj gönderilemedi.');
+    } finally {
+      el.chatSendBtn.disabled = false;
+      el.chatInput.disabled = false;
+      el.chatInput.focus();
+    }
+  }
+
+  el.chatSendBtn.addEventListener('click', sendChatMessage);
+  el.chatInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      sendChatMessage();
+    }
+  });
+
+  // ---------------------------------------------------------
+  // PAZAR
+  // ---------------------------------------------------------
+
+  async function fetchMarket() {
+    try {
+      const data = await apiPost('/api/market', {});
+      applyMarketPayload(data);
+      renderMarket();
+    } catch (err) {
+      showToast(err.message || 'Pazar yüklenemedi.');
+    }
+  }
+
+  function applyMarketPayload(data) {
+    state.marketLevel = data.marketLevel;
+    state.myOffers = data.myOffers;
+    state.marketOffers = data.offers;
+    if (data.village && state.village) {
+      Object.assign(state.village, data.village);
+      updateResourceBar();
+    }
+  }
+
+  function updateResourceBar() {
+    const resources = {
+      wood: [state.village.wood, state.village.woodProduction],
+      clay: [state.village.clay, state.village.clayProduction],
+      iron: [state.village.iron, state.village.ironProduction],
+      grain: [state.village.grain, state.village.grainProduction]
+    };
+    for (const chip of document.querySelectorAll('.res-chip')) {
+      const key = chip.dataset.res;
+      const [amount, rate] = resources[key];
+      chip.amountEl.textContent = Math.floor(amount);
+      chip.rateEl.textContent = `+${rate}/sa`;
+    }
+  }
+
+  function renderMarket() {
+    el.marketLevelEl.textContent = state.marketLevel;
+    el.marketSlotsEl.textContent = `${state.myOffers.length} / ${state.marketLevel} açık teklif kullanılıyor.`;
+
+    el.myOffersList.innerHTML = '';
+    if (state.myOffers.length === 0) {
+      el.myOffersList.innerHTML = '<p class="queue-empty">Açık teklifin yok.</p>';
+    } else {
+      for (const o of state.myOffers) {
+        const row = document.createElement('div');
+        row.className = 'queue-item offer-item';
+        row.innerHTML =
+          `<span class="offer-text">${o.offerAmount} ${RESOURCE_LABEL[o.offerResource]} → ${o.requestAmount} ${RESOURCE_LABEL[o.requestResource]}</span>` +
+          `<button class="offer-action-btn cancel" data-offer="${o.id}">İptal</button>`;
+        el.myOffersList.appendChild(row);
+      }
+      el.myOffersList.querySelectorAll('.offer-action-btn.cancel').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          try {
+            const data = await apiPost('/api/market/cancel', { offerId: Number(btn.dataset.offer) });
+            applyMarketPayload(data);
+            renderMarket();
+            showToast('Teklif iptal edildi.');
+          } catch (err) {
+            showToast(err.message || 'İptal edilemedi.');
+            btn.disabled = false;
+          }
+        });
+      });
+    }
+
+    el.marketOffersList.innerHTML = '';
+    if (state.marketOffers.length === 0) {
+      el.marketOffersList.innerHTML = '<p class="queue-empty">Piyasada teklif yok.</p>';
+    } else {
+      for (const o of state.marketOffers) {
+        const item = document.createElement('div');
+        item.className = 'report-item';
+        item.innerHTML =
+          `<div class="report-top offer-item">` +
+          `<span class="offer-text">${o.offerAmount} ${RESOURCE_LABEL[o.offerResource]} → ${o.requestAmount} ${RESOURCE_LABEL[o.requestResource]}` +
+          `<span class="offer-from">${o.fromName} · ${o.fromVillage}</span></span>` +
+          `<button class="offer-action-btn accept" data-offer="${o.id}">Kabul Et</button>` +
+          `</div>`;
+        el.marketOffersList.appendChild(item);
+      }
+      el.marketOffersList.querySelectorAll('.offer-action-btn.accept').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          const original = btn.textContent;
+          btn.textContent = '…';
+          try {
+            const data = await apiPost('/api/market/accept', { offerId: Number(btn.dataset.offer) });
+            applyMarketPayload(data);
+            renderMarket();
+            showToast('Takas tamamlandı!');
+          } catch (err) {
+            showToast(err.message || 'Kabul edilemedi.');
+            btn.disabled = false;
+            btn.textContent = original;
+          }
+        });
+      });
+    }
+  }
+
+  el.marketCreateBtn.addEventListener('click', async () => {
+    const offerResource = el.offerResourceSelect.value;
+    const requestResource = el.requestResourceSelect.value;
+    const offerAmount = parseInt(el.offerAmountInput.value, 10) || 0;
+    const requestAmount = parseInt(el.requestAmountInput.value, 10) || 0;
+
+    if (offerResource === requestResource) {
+      showToast('Verdiğin ve istediğin kaynak aynı olamaz.');
+      return;
+    }
+    if (offerAmount <= 0 || requestAmount <= 0) {
+      showToast('Geçerli bir miktar gir.');
+      return;
+    }
+
+    el.marketCreateBtn.disabled = true;
+    el.marketCreateBtn.textContent = 'Oluşturuluyor…';
+
+    try {
+      const data = await apiPost('/api/market/create', { offerResource, offerAmount, requestResource, requestAmount });
+      applyMarketPayload(data);
+      renderMarket();
+      showToast('Teklif oluşturuldu!');
+    } catch (err) {
+      showToast(err.message || 'Teklif oluşturulamadı.');
+    } finally {
+      el.marketCreateBtn.disabled = false;
+      el.marketCreateBtn.textContent = 'Teklif Oluştur';
+    }
+  });
+
+  // ---------------------------------------------------------
   // DUNYA HARITASI
   // ---------------------------------------------------------
 
@@ -716,15 +951,22 @@
     el.viewVillage.hidden = tab !== 'village';
     el.viewMap.hidden = tab !== 'map';
     el.viewMilitary.hidden = tab !== 'military';
+    el.viewMarket.hidden = tab !== 'market';
+    el.viewChat.hidden = tab !== 'chat';
     el.viewAttack.hidden = tab !== 'attack';
-    el.viewPlaceholder.hidden = tab !== 'market';
+    el.viewPlaceholder.hidden = true;
 
-    if (tab === 'market') {
-      el.placeholderText.textContent = "Pazar ve kaynak takası Aşama 6'da eklenecek.";
-    }
     if (tab === 'map') fetchMap();
     if (tab === 'military') renderMilitary();
+    if (tab === 'market') fetchMarket();
     if (tab === 'attack') { renderAttack(); fetchReports(); }
+
+    if (tab === 'chat') {
+      fetchChat();
+      startChatPolling();
+    } else {
+      stopChatPolling();
+    }
   });
 
   // ---------------------------------------------------------

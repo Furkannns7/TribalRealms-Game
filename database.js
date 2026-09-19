@@ -6,6 +6,7 @@
 
 const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
+const { getProductionPerHour } = require('./game-config');
 
 // Veritabani dosyasi proje klasorunde "game.db" adiyla olusturulacak/acilacak.
 const db = new DatabaseSync(path.join(__dirname, 'game.db'));
@@ -133,6 +134,60 @@ function initDatabase() {
     )
   `);
 
+  // ---- MARKET_OFFERS TABLOSU (Asama 6) ----
+  // Oyuncularin pazara koydugu acik kaynak takas teklifleri. Teklif
+  // konulurken verilecek kaynak koyden hemen dusulur ("rezerve edilir"),
+  // boylece ayni kaynak iki teklifte birden kullanilamaz.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS market_offers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      village_id INTEGER NOT NULL,
+      offer_resource TEXT NOT NULL,
+      offer_amount INTEGER NOT NULL,
+      request_resource TEXT NOT NULL,
+      request_amount INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (village_id) REFERENCES villages(id)
+    )
+  `);
+
+  // ---- CHAT_MESSAGES TABLOSU (Asama 7) ----
+  // Tum oyunculara acik tek bir genel sohbet odasi.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      message TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  // ---- CLANS TABLOSU (Asama 8) ----
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS clans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      tag TEXT NOT NULL UNIQUE,
+      leader_user_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // ---- CLAN_CHAT_MESSAGES TABLOSU (Asama 8) ----
+  // Sadece o klanin uyelerinin gordugu ozel sohbet.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS clan_chat_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clan_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      message TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (clan_id) REFERENCES clans(id),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
   // ---- MIGRATION (onceki asamalardan kalma eski game.db dosyalari icin) ----
   // Asagidaki ALTER'lar sutun zaten varsa sessizce hata verir, o hata yoksayilir.
   try { db.exec('ALTER TABLE buildings ADD COLUMN upgrading INTEGER DEFAULT 0'); } catch (err) {}
@@ -164,6 +219,36 @@ function initDatabase() {
   const insertBarracks = db.prepare('INSERT INTO buildings (village_id, type, level) VALUES (?, ?, 1)');
   for (const v of villagesWithoutBarracks) {
     insertBarracks.run(v.id, 'barracks');
+  }
+
+  // Eski koylere (Asama 6'dan once olusturulmus) pazar ekle.
+  const villagesWithoutMarket = db.prepare(`
+    SELECT v.id FROM villages v
+    WHERE NOT EXISTS (SELECT 1 FROM buildings b WHERE b.village_id = v.id AND b.type = 'market')
+  `).all();
+  const insertMarket = db.prepare('INSERT INTO buildings (village_id, type, level) VALUES (?, ?, 1)');
+  for (const v of villagesWithoutMarket) {
+    insertMarket.run(v.id, 'market');
+  }
+
+  // Uretim hizi formulu (game-config.js -> BASE_PRODUCTION_PER_HOUR)
+  // degistiginde, mevcut koylerin uretim sutunlarini bina seviyelerine
+  // gore yeniden hesapla. Boylece dengeleme sayisini degistirdiginde
+  // eski koyler de otomatik guncellenir, tekrar bina yukseltmesi gerekmez.
+  const PRODUCTION_COLUMN_BY_BUILDING = {
+    woodcutter: 'wood_production',
+    clay_pit: 'clay_production',
+    iron_mine: 'iron_production',
+    grain_field: 'grain_production'
+  };
+  const resourceBuildings = db.prepare(`
+    SELECT village_id, type, level FROM buildings
+    WHERE type IN ('woodcutter', 'clay_pit', 'iron_mine', 'grain_field')
+  `).all();
+  for (const b of resourceBuildings) {
+    const column = PRODUCTION_COLUMN_BY_BUILDING[b.type];
+    const correctProduction = getProductionPerHour(b.level);
+    db.prepare(`UPDATE villages SET ${column} = ? WHERE id = ?`).run(correctProduction, b.village_id);
   }
 
   console.log('Veritabani tablolari hazir.');

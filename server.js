@@ -19,6 +19,8 @@ const { getArmy, getTrainingQueue, completeFinishedTraining, startTraining } = r
 const {
   launchAttack, completeFinishedAttacks, getOutgoingAttacks, getIncomingAttacks, getReportsForUser
 } = require('./combat');
+const { getVillageOffers, getOtherOffers, createOffer, cancelOffer, acceptOffer } = require('./market');
+const { getRecentMessages, sendMessage } = require('./chat');
 
 const BOT_TOKEN = (process.env.BOT_TOKEN || '').trim();
 
@@ -170,6 +172,51 @@ function formatReport(row, viewerUserId) {
     loot,
     createdAt: row.created_at
   };
+}
+
+// Bir koyun pazar durumunu (seviye, kendi teklifleri, baskalarinin
+// teklifleri, guncel kaynaklar) mini app'in anlayacagi JSON'a cevirir.
+function buildMarketPayload(villageId) {
+  const village = refreshVillage(villageId);
+  const marketBuilding = getBuilding(villageId, 'market');
+
+  return {
+    marketLevel: marketBuilding.level,
+    myOffers: getVillageOffers(villageId).map((o) => ({
+      id: o.id,
+      offerResource: o.offer_resource,
+      offerAmount: o.offer_amount,
+      requestResource: o.request_resource,
+      requestAmount: o.request_amount
+    })),
+    offers: getOtherOffers(villageId, 50).map((o) => ({
+      id: o.id,
+      offerResource: o.offer_resource,
+      offerAmount: o.offer_amount,
+      requestResource: o.request_resource,
+      requestAmount: o.request_amount,
+      fromName: o.username ? '@' + o.username : o.first_name,
+      fromVillage: o.village_name
+    })),
+    village: {
+      wood: village.wood,
+      clay: village.clay,
+      iron: village.iron,
+      grain: village.grain,
+      warehouseCapacity: village.warehouse_capacity,
+      granaryCapacity: village.granary_capacity
+    }
+  };
+}
+
+function formatChatMessages(rows, viewerUserId) {
+  return rows.map((r) => ({
+    id: r.id,
+    senderName: r.username ? '@' + r.username : r.first_name,
+    message: r.message,
+    createdAt: r.created_at,
+    isMine: r.user_id === viewerUserId
+  }));
 }
 
 function startServer(port) {
@@ -343,6 +390,89 @@ function startServer(port) {
     });
 
     res.json({ worldSize: WORLD_SIZE, villages });
+  });
+
+  // Bu koyun pazar durumunu (seviye, kendi teklifleri, baskalarinin
+  // teklifleri) getirir.
+  app.post('/api/market', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+    const village = getVillageForUser(dbUser);
+    if (!village) return res.status(404).json({ error: 'Once koy kurmalisin.' });
+
+    res.json(buildMarketPayload(village.id));
+  });
+
+  // Yeni bir takas teklifi olusturur.
+  app.post('/api/market/create', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+    const village = getVillageForUser(dbUser);
+    if (!village) return res.status(404).json({ error: 'Once koy kurmalisin.' });
+
+    const marketBuilding = getBuilding(village.id, 'market');
+    const offerAmount = Math.floor(Number(req.body.offerAmount));
+    const requestAmount = Math.floor(Number(req.body.requestAmount));
+
+    const result = createOffer(
+      village.id, req.body.offerResource, offerAmount, req.body.requestResource, requestAmount, marketBuilding.level
+    );
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    res.json(buildMarketPayload(village.id));
+  });
+
+  // Kendi teklifini iptal eder.
+  app.post('/api/market/cancel', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+    const village = getVillageForUser(dbUser);
+    if (!village) return res.status(404).json({ error: 'Once koy kurmalisin.' });
+
+    const result = cancelOffer(Number(req.body.offerId), village.id);
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    res.json(buildMarketPayload(village.id));
+  });
+
+  // Baska bir oyuncunun teklifini kabul eder.
+  app.post('/api/market/accept', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+    const village = getVillageForUser(dbUser);
+    if (!village) return res.status(404).json({ error: 'Once koy kurmalisin.' });
+
+    const result = acceptOffer(Number(req.body.offerId), village.id);
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    res.json(buildMarketPayload(village.id));
+  });
+
+  // Genel sohbetteki son mesajlari getirir.
+  app.post('/api/chat', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+
+    res.json({ messages: formatChatMessages(getRecentMessages(50), dbUser.id) });
+  });
+
+  // Genel sohbete yeni bir mesaj gonderir.
+  app.post('/api/chat/send', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+
+    const result = sendMessage(dbUser.id, req.body.message);
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    res.json({ messages: formatChatMessages(getRecentMessages(50), dbUser.id) });
   });
 
   app.listen(port, () => {

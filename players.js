@@ -4,12 +4,12 @@
 // ihtiyac duyuyor.
 
 const { db } = require('./database');
-const { WORLD_SIZE } = require('./game-config');
+const { WORLD_SIZE, getProductionPerHour } = require('./game-config');
 
 // Koye eklenecek temel binalar (hepsi seviye 1'den baslar).
 const DEFAULT_BUILDINGS = [
   'main_building', 'woodcutter', 'clay_pit', 'iron_mine',
-  'grain_field', 'warehouse', 'granary', 'barracks'
+  'grain_field', 'warehouse', 'granary', 'barracks', 'market'
 ];
 
 // Kullaniciyi veritabaninda bulur; yoksa (henuz koy/medeniyet olmadan) yeni
@@ -44,12 +44,13 @@ function createVillage(userId, villageName, civilization) {
 
   const x = Math.floor(Math.random() * WORLD_SIZE);
   const y = Math.floor(Math.random() * WORLD_SIZE);
+  const startProduction = getProductionPerHour(1);
 
   const insertVillage = db.prepare(`
-    INSERT INTO villages (user_id, name, x, y, last_updated)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO villages (user_id, name, x, y, last_updated, wood_production, clay_production, iron_production, grain_production)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  insertVillage.run(userId, villageName, x, y, new Date().toISOString());
+  insertVillage.run(userId, villageName, x, y, new Date().toISOString(), startProduction, startProduction, startProduction, startProduction);
 
   const villageId = db.prepare('SELECT id FROM villages WHERE user_id = ?').get(userId).id;
 
