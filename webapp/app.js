@@ -62,6 +62,8 @@
     myOffers: [],
     marketOffers: [],
     chatMessages: [],
+    chatScope: 'global',
+    clanStatus: { inClan: false, clan: null, members: [], clans: [] },
     activeSheetType: null,
     activeTab: 'village'
   };
@@ -93,9 +95,21 @@
     marketOffersList: document.getElementById('market-offers-list'),
     viewAttack: document.getElementById('view-attack'),
     viewChat: document.getElementById('view-chat'),
+    chatScopeToggle: document.getElementById('chat-scope-toggle'),
     chatMessagesEl: document.getElementById('chat-messages'),
     chatInput: document.getElementById('chat-input'),
     chatSendBtn: document.getElementById('chat-send-btn'),
+    viewClan: document.getElementById('view-clan'),
+    clanNoClanView: document.getElementById('clan-no-clan-view'),
+    clanInClanView: document.getElementById('clan-in-clan-view'),
+    clanNameInput: document.getElementById('clan-name-input'),
+    clanTagInput: document.getElementById('clan-tag-input'),
+    clanCreateBtn: document.getElementById('clan-create-btn'),
+    clanBrowseList: document.getElementById('clan-browse-list'),
+    clanHeaderName: document.getElementById('clan-header-name'),
+    clanHeaderTag: document.getElementById('clan-header-tag'),
+    clanMembersList: document.getElementById('clan-members-list'),
+    clanLeaveBtn: document.getElementById('clan-leave-btn'),
     viewPlaceholder: document.getElementById('view-placeholder'),
     placeholderText: document.getElementById('placeholder-text'),
     civPicker: document.getElementById('view-civ-picker'),
@@ -607,8 +621,9 @@
   }
 
   async function fetchChat() {
+    const endpoint = state.chatScope === 'clan' ? '/api/clan/chat' : '/api/chat';
     try {
-      const data = await apiPost('/api/chat', {});
+      const data = await apiPost(endpoint, {});
       state.chatMessages = data.messages;
       renderChat();
     } catch (err) {
@@ -655,11 +670,13 @@
     const text = el.chatInput.value.trim();
     if (!text) return;
 
+    const endpoint = state.chatScope === 'clan' ? '/api/clan/chat/send' : '/api/chat/send';
+
     el.chatSendBtn.disabled = true;
     el.chatInput.disabled = true;
 
     try {
-      const data = await apiPost('/api/chat/send', { message: text });
+      const data = await apiPost(endpoint, { message: text });
       state.chatMessages = data.messages;
       renderChat();
       el.chatInput.value = '';
@@ -677,6 +694,158 @@
     if (event.key === 'Enter') {
       event.preventDefault();
       sendChatMessage();
+    }
+  });
+
+  el.chatScopeToggle.addEventListener('click', (event) => {
+    const btn = event.target.closest('.scope-btn');
+    if (!btn) return;
+
+    document.querySelectorAll('.scope-btn').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.chatScope = btn.dataset.scope;
+    fetchChat();
+  });
+
+  // ---------------------------------------------------------
+  // KLAN
+  // ---------------------------------------------------------
+
+  async function fetchClanStatus(renderAfter) {
+    try {
+      const data = await apiPost('/api/clan', {});
+      state.clanStatus = data;
+
+      el.chatScopeToggle.classList.toggle('hidden', !data.inClan);
+      if (!data.inClan && state.chatScope === 'clan') {
+        state.chatScope = 'global';
+        document.querySelectorAll('.scope-btn').forEach((b) => b.classList.remove('active'));
+        document.querySelector('.scope-btn[data-scope="global"]').classList.add('active');
+      }
+
+      if (renderAfter) renderClan();
+    } catch (err) {
+      // sessiz gec
+    }
+  }
+
+  function renderClan() {
+    const status = state.clanStatus;
+
+    el.clanNoClanView.hidden = status.inClan;
+    el.clanInClanView.hidden = !status.inClan;
+
+    if (!status.inClan) {
+      el.clanBrowseList.innerHTML = '';
+      if (!status.clans || status.clans.length === 0) {
+        el.clanBrowseList.innerHTML = '<p class="queue-empty">Henüz hiç klan kurulmamış. İlk klanı sen kur!</p>';
+      } else {
+        for (const c of status.clans) {
+          const item = document.createElement('div');
+          item.className = 'report-item';
+          item.innerHTML =
+            `<div class="report-top offer-item">` +
+            `<span class="offer-text">${c.name} [${c.tag}]<span class="offer-from">${c.memberCount} üye</span></span>` +
+            `<button class="offer-action-btn accept" data-clan="${c.id}">Katıl</button>` +
+            `</div>`;
+          el.clanBrowseList.appendChild(item);
+        }
+        el.clanBrowseList.querySelectorAll('.offer-action-btn.accept').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            try {
+              const data = await apiPost('/api/clan/join', { clanId: Number(btn.dataset.clan) });
+              state.clanStatus = data;
+              renderClan();
+              showToast('Klana katıldın!');
+            } catch (err) {
+              showToast(err.message || 'Katılamadın.');
+              btn.disabled = false;
+            }
+          });
+        });
+      }
+    } else {
+      el.clanHeaderName.textContent = status.clan.name;
+      el.clanHeaderTag.textContent = status.clan.tag;
+
+      el.clanMembersList.innerHTML = '';
+      for (const m of status.members) {
+        const row = document.createElement('div');
+        row.className = 'queue-item member-row';
+        row.innerHTML =
+          `<span class="member-name">${m.name}${m.isLeader ? '<span class="leader-badge">LİDER</span>' : ''}</span>`;
+
+        if (status.clan.isLeader && !m.isLeader) {
+          const kickBtn = document.createElement('button');
+          kickBtn.className = 'offer-action-btn cancel';
+          kickBtn.textContent = 'At';
+          kickBtn.addEventListener('click', async () => {
+            kickBtn.disabled = true;
+            try {
+              const data = await apiPost('/api/clan/kick', { targetUserId: m.id });
+              state.clanStatus = data;
+              renderClan();
+              showToast('Üye klandan atıldı.');
+            } catch (err) {
+              showToast(err.message || 'Atılamadı.');
+              kickBtn.disabled = false;
+            }
+          });
+          row.appendChild(kickBtn);
+        }
+
+        el.clanMembersList.appendChild(row);
+      }
+    }
+  }
+
+  el.clanCreateBtn.addEventListener('click', async () => {
+    const name = el.clanNameInput.value.trim();
+    const tag = el.clanTagInput.value.trim();
+
+    if (name.length < 3) {
+      showToast('Klan adı en az 3 karakter olmalı.');
+      return;
+    }
+    if (tag.length < 2) {
+      showToast('Klan etiketi en az 2 karakter olmalı.');
+      return;
+    }
+
+    el.clanCreateBtn.disabled = true;
+    el.clanCreateBtn.textContent = 'Kuruluyor…';
+
+    try {
+      const data = await apiPost('/api/clan/create', { name, tag });
+      state.clanStatus = data;
+      renderClan();
+      el.chatScopeToggle.classList.remove('hidden');
+      showToast('Klan kuruldu!');
+    } catch (err) {
+      showToast(err.message || 'Klan kurulamadı.');
+    } finally {
+      el.clanCreateBtn.disabled = false;
+      el.clanCreateBtn.textContent = 'Klan Kur';
+    }
+  });
+
+  el.clanLeaveBtn.addEventListener('click', async () => {
+    el.clanLeaveBtn.disabled = true;
+    try {
+      const data = await apiPost('/api/clan/leave', {});
+      state.clanStatus = data;
+      renderClan();
+      el.chatScopeToggle.classList.add('hidden');
+      if (state.chatScope === 'clan') {
+        state.chatScope = 'global';
+        fetchChat();
+      }
+      showToast('Klandan ayrıldın.');
+    } catch (err) {
+      showToast(err.message || 'Ayrılamadın.');
+    } finally {
+      el.clanLeaveBtn.disabled = false;
     }
   });
 
@@ -822,8 +991,12 @@
   // ---------------------------------------------------------
 
   const CIV_CLASS = { roma: 'civ-roma', galya: 'civ-galya', toton: 'civ-toton' };
+  const MAP_MIN_SPAN = 6;
   let mapVillages = [];
   let activeMapVillageId = null;
+  let mapWorldSize = 50;
+  let mapView = { x: 0, y: 0, w: 50, h: 50 };
+  let mapDragState = null;
 
   async function fetchMap() {
     try {
@@ -835,9 +1008,98 @@
     }
   }
 
+  function clampMapView(view) {
+    let { x, y, w, h } = view;
+    w = Math.min(Math.max(w, MAP_MIN_SPAN), mapWorldSize);
+    h = Math.min(Math.max(h, MAP_MIN_SPAN), mapWorldSize);
+    x = Math.min(Math.max(x, 0), Math.max(0, mapWorldSize - w));
+    y = Math.min(Math.max(y, 0), Math.max(0, mapWorldSize - h));
+    return { x, y, w, h };
+  }
+
+  function applyMapView() {
+    el.mapSvg.setAttribute('viewBox', `${mapView.x} ${mapView.y} ${mapView.w} ${mapView.h}`);
+  }
+
+  function zoomMap(factor) {
+    const cx = mapView.x + mapView.w / 2;
+    const cy = mapView.y + mapView.h / 2;
+    const newW = mapView.w * factor;
+    const newH = mapView.h * factor;
+    mapView = clampMapView({ x: cx - newW / 2, y: cy - newH / 2, w: newW, h: newH });
+    applyMapView();
+  }
+
+  function panMap(fracX, fracY) {
+    mapView = clampMapView({
+      x: mapView.x + mapView.w * fracX,
+      y: mapView.y + mapView.h * fracY,
+      w: mapView.w,
+      h: mapView.h
+    });
+    applyMapView();
+  }
+
+  function centerMapOnMyVillage() {
+    const mine = mapVillages.find((v) => v.isMine);
+    if (!mine) return;
+    mapView = clampMapView({ x: mine.x - mapView.w / 2, y: mine.y - mapView.h / 2, w: mapView.w, h: mapView.h });
+    applyMapView();
+  }
+
+  document.getElementById('map-zoom-in').addEventListener('click', () => zoomMap(0.7));
+  document.getElementById('map-zoom-out').addEventListener('click', () => zoomMap(1 / 0.7));
+  document.getElementById('map-center-btn').addEventListener('click', centerMapOnMyVillage);
+
+  document.querySelectorAll('.map-dpad-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const step = 0.4;
+      const dir = btn.dataset.dir;
+      if (dir === 'up') panMap(0, -step);
+      if (dir === 'down') panMap(0, step);
+      if (dir === 'left') panMap(-step, 0);
+      if (dir === 'right') panMap(step, 0);
+    });
+  });
+
+  // Parmakla/fare ile surukleyerek haritada gezinme.
+  el.mapSvg.addEventListener('pointerdown', (event) => {
+    mapDragState = { startX: event.clientX, startY: event.clientY, view: { ...mapView } };
+    el.mapSvg.setPointerCapture(event.pointerId);
+  });
+
+  el.mapSvg.addEventListener('pointermove', (event) => {
+    if (!mapDragState) return;
+    const rect = el.mapSvg.getBoundingClientRect();
+    const unitsPerPxX = mapDragState.view.w / rect.width;
+    const unitsPerPxY = mapDragState.view.h / rect.height;
+    const dxPx = event.clientX - mapDragState.startX;
+    const dyPx = event.clientY - mapDragState.startY;
+    mapView = clampMapView({
+      x: mapDragState.view.x - dxPx * unitsPerPxX,
+      y: mapDragState.view.y - dyPx * unitsPerPxY,
+      w: mapDragState.view.w,
+      h: mapDragState.view.h
+    });
+    applyMapView();
+  });
+
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((evt) => {
+    el.mapSvg.addEventListener(evt, () => { mapDragState = null; });
+  });
+
   function renderMap(worldSize, villages) {
+    mapWorldSize = worldSize;
+
+    // Ilk acilista (ya da her sekme yenilendiginde) kendi koyune
+    // odaklanmis, yakinlastirilmis bir gorunumle basla.
+    const mine = villages.find((v) => v.isMine);
+    const initialSpan = Math.min(16, worldSize);
+    const centerX = mine ? mine.x : worldSize / 2;
+    const centerY = mine ? mine.y : worldSize / 2;
+    mapView = clampMapView({ x: centerX - initialSpan / 2, y: centerY - initialSpan / 2, w: initialSpan, h: initialSpan });
+
     const svg = el.mapSvg;
-    svg.setAttribute('viewBox', `0 0 ${worldSize} ${worldSize}`);
     svg.innerHTML = '';
 
     const ns = 'http://www.w3.org/2000/svg';
@@ -857,6 +1119,13 @@
     }
 
     for (const v of villages) {
+      const halo = document.createElementNS(ns, 'circle');
+      halo.setAttribute('cx', v.x);
+      halo.setAttribute('cy', v.y);
+      halo.setAttribute('r', v.isMine ? 2.2 : 1.6);
+      halo.setAttribute('class', 'map-village-dot-halo');
+      svg.appendChild(halo);
+
       const dot = document.createElementNS(ns, 'circle');
       dot.setAttribute('cx', v.x);
       dot.setAttribute('cy', v.y);
@@ -865,15 +1134,15 @@
       dot.addEventListener('click', () => openVillageInfoSheet(v));
       svg.appendChild(dot);
 
-      if (v.isMine) {
-        const label = document.createElementNS(ns, 'text');
-        label.setAttribute('x', v.x);
-        label.setAttribute('y', v.y - 2);
-        label.setAttribute('class', 'map-village-label');
-        label.textContent = 'Sen';
-        svg.appendChild(label);
-      }
+      const label = document.createElementNS(ns, 'text');
+      label.setAttribute('x', v.x);
+      label.setAttribute('y', v.y - 2);
+      label.setAttribute('class', v.isMine ? 'map-village-label' : 'map-village-clan-tag');
+      label.textContent = v.isMine ? 'Sen' : (v.clanTag || '');
+      if (label.textContent) svg.appendChild(label);
     }
+
+    applyMapView();
   }
 
   function openVillageInfoSheet(village) {
@@ -887,7 +1156,8 @@
       el.villageInfoAttackBtn.style.display = 'none';
     } else {
       const civName = CIVILIZATION_NAMES[village.civilization] || village.civilization;
-      el.villageInfoOwner.textContent = `Sahip: ${village.ownerName}`;
+      const clanPart = village.clanTag ? ` · [${village.clanTag}]` : '';
+      el.villageInfoOwner.textContent = `Sahip: ${village.ownerName}${clanPart}`;
       el.villageInfoDetail.textContent = `${civName} · ${village.distance} kare uzaklıkta`;
       el.villageInfoAttackBtn.style.display = '';
     }
@@ -953,12 +1223,14 @@
     el.viewMilitary.hidden = tab !== 'military';
     el.viewMarket.hidden = tab !== 'market';
     el.viewChat.hidden = tab !== 'chat';
+    el.viewClan.hidden = tab !== 'clan';
     el.viewAttack.hidden = tab !== 'attack';
     el.viewPlaceholder.hidden = true;
 
     if (tab === 'map') fetchMap();
     if (tab === 'military') renderMilitary();
     if (tab === 'market') fetchMarket();
+    if (tab === 'clan') fetchClanStatus(true);
     if (tab === 'attack') { renderAttack(); fetchReports(); }
 
     if (tab === 'chat') {
@@ -1023,6 +1295,7 @@
 
     try {
       await fetchVillage();
+      fetchClanStatus(false);
     } catch (err) {
       el.loadingText.textContent = err.message || 'Köy yüklenemedi. Önce botta /start yapmalısın.';
     }

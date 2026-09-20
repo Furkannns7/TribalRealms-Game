@@ -31,6 +31,14 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+/* HTML'in "hidden" ozelligi, normalde tarayicinin dahili (cok dusuk
+   oncelikli) bir kuraliyla gizlenir. Ama #view-chat, #view-placeholder gibi
+   elemanlarda "display: flex" tanimladigimizda, bu daha yuksek oncelikli
+   kural "hidden"i ezip elemani GORUNUR birakiyordu (sekmeler arasi
+   gecerken bir onceki sekmenin icerigi kaybolmuyordu). Bu kural, "hidden"
+   her zaman gercekten gizlesin diye en yuksek onceligi garanti eder. */
+[hidden] { display: none !important; }
+
 html, body {
   height: 100%;
   margin: 0;
@@ -897,16 +905,29 @@ html, body {
 }
 
 #map-scene {
+  position: relative;
   height: 100%;
   border-radius: 18px;
   overflow: hidden;
-  background: #ddc9a3;
+  background:
+    radial-gradient(ellipse 22% 14% at 15% 20%, rgba(95,143,78,0.35) 0%, transparent 70%),
+    radial-gradient(ellipse 26% 16% at 80% 15%, rgba(95,143,78,0.3) 0%, transparent 70%),
+    radial-gradient(ellipse 20% 14% at 70% 75%, rgba(139,115,85,0.3) 0%, transparent 70%),
+    radial-gradient(ellipse 24% 15% at 20% 80%, rgba(95,143,78,0.28) 0%, transparent 70%),
+    radial-gradient(ellipse 30% 20% at 50% 50%, rgba(201,168,116,0.2) 0%, transparent 75%),
+    #ddc9a3;
   box-shadow: inset 0 0 0 4px var(--wood-mid), inset 0 0 30px rgba(0,0,0,0.12);
 }
 
-#map-svg { width: 100%; height: 100%; display: block; }
+#map-svg { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+#map-svg:active { cursor: grabbing; }
 
-.map-grid-line { stroke: rgba(74, 52, 35, 0.14); stroke-width: 0.05; }
+.map-grid-line { stroke: rgba(74, 52, 35, 0.16); stroke-width: 0.06; stroke-dasharray: 0.3 0.3; }
+
+.map-village-dot-halo {
+  fill: rgba(46, 36, 24, 0.12);
+  pointer-events: none;
+}
 
 .map-village-dot {
   stroke: var(--wood-dark);
@@ -922,6 +943,12 @@ html, body {
   fill: var(--gold);
   stroke: var(--ink);
   stroke-width: 0.2;
+  animation: map-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes map-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
 }
 
 .map-village-label {
@@ -932,6 +959,95 @@ html, body {
   text-anchor: middle;
   pointer-events: none;
 }
+
+.map-village-clan-tag {
+  font-size: 1.3px;
+  font-family: var(--font-body);
+  font-weight: 700;
+  fill: var(--roof-red-dark);
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+/* ---------- Harita kontrolleri (zoom / pan) ---------- */
+
+#map-zoom-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 5;
+}
+
+.map-ctrl-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--wood-mid);
+  background: rgba(244, 236, 216, 0.92);
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  padding: 0;
+}
+
+.map-ctrl-btn:active { transform: scale(0.92); }
+.map-ctrl-center { font-size: 15px; color: var(--roof-red); }
+
+#map-dpad {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  width: 92px;
+  height: 92px;
+  z-index: 5;
+}
+
+.map-dpad-btn {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 2px solid var(--wood-mid);
+  background: rgba(244, 236, 216, 0.92);
+  color: var(--ink);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.22);
+  padding: 0;
+}
+
+.map-dpad-btn:active { transform: scale(0.92); }
+.map-dpad-up { top: 0; left: 31px; }
+.map-dpad-down { bottom: 0; left: 31px; }
+.map-dpad-left { top: 31px; left: 0; }
+.map-dpad-right { top: 31px; right: 0; }
+
+#map-compass {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 40px;
+  height: 40px;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+.compass-ring { fill: rgba(244, 236, 216, 0.85); stroke: var(--wood-mid); stroke-width: 1.5; }
+.compass-cross { stroke: var(--wood-light); stroke-width: 1; }
+.compass-needle { fill: var(--roof-red); }
+.compass-label { font-size: 8px; font-weight: 700; fill: var(--ink); text-anchor: middle; font-family: var(--font-body); }
 
 /* ---------- Harita: koy bilgi paneli (mevcut bottom-sheet ile ayni gorunum) ---------- */
 
@@ -1065,6 +1181,44 @@ html, body {
 
 .chat-send-btn:active { transform: translateY(1px); box-shadow: 0 1px 0 var(--roof-red-dark); }
 .chat-send-btn:disabled { background: var(--stone); box-shadow: 0 2px 0 var(--stone-dark); }
+
+.chat-scope-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.chat-scope-toggle.hidden { display: none; }
+
+.scope-btn {
+  flex: 1;
+  border: none;
+  border-radius: 10px;
+  background: var(--parchment-dark);
+  color: var(--ink-soft);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 8px;
+  cursor: pointer;
+}
+
+.scope-btn.active { background: var(--roof-red); color: var(--parchment); }
+
+/* ---------- Klan uye satirlari ---------- */
+
+.member-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.member-row .member-name { font-size: 12.5px; font-weight: 600; }
+.member-row .leader-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--gold-dark);
+  margin-left: 6px;
+}
 
 /* ---------- Pazar: takas formu ---------- */
 

@@ -20,7 +20,8 @@ const {
   launchAttack, completeFinishedAttacks, getOutgoingAttacks, getIncomingAttacks, getReportsForUser
 } = require('./combat');
 const { getVillageOffers, getOtherOffers, createOffer, cancelOffer, acceptOffer } = require('./market');
-const { getRecentMessages, sendMessage } = require('./chat');
+const { getRecentMessages, sendMessage, getClanMessages, sendClanMessage } = require('./chat');
+const { getClanById, getClanMembers, getAllClans, createClan, joinClan, leaveClan, kickMember } = require('./clans');
 
 const BOT_TOKEN = (process.env.BOT_TOKEN || '').trim();
 
@@ -219,6 +220,30 @@ function formatChatMessages(rows, viewerUserId) {
   }));
 }
 
+// Bu kullanicinin klan durumunu (klandaysa uye listesiyle, degilse
+// katilinabilecek klan listesiyle) mini app'in anlayacagi JSON'a cevirir.
+function buildClanStatusPayload(dbUser) {
+  if (!dbUser.clan_id) {
+    return {
+      inClan: false,
+      clans: getAllClans().map((c) => ({ id: c.id, name: c.name, tag: c.tag, memberCount: c.member_count }))
+    };
+  }
+
+  const clan = getClanById(dbUser.clan_id);
+  const members = getClanMembers(dbUser.clan_id).map((m) => ({
+    id: m.id,
+    name: m.username ? '@' + m.username : m.first_name,
+    isLeader: m.id === clan.leader_user_id
+  }));
+
+  return {
+    inClan: true,
+    clan: { id: clan.id, name: clan.name, tag: clan.tag, isLeader: clan.leader_user_id === dbUser.id },
+    members
+  };
+}
+
 function startServer(port) {
   const app = express();
   app.use(express.json());
@@ -366,8 +391,10 @@ function startServer(port) {
     const myVillage = getVillageForUser(dbUser);
 
     const rows = db.prepare(`
-      SELECT v.id, v.name, v.x, v.y, u.telegram_id, u.username, u.first_name, u.civilization
-      FROM villages v JOIN users u ON u.id = v.user_id
+      SELECT v.id, v.name, v.x, v.y, u.telegram_id, u.username, u.first_name, u.civilization, c.tag AS clan_tag
+      FROM villages v
+      JOIN users u ON u.id = v.user_id
+      LEFT JOIN clans c ON c.id = u.clan_id
     `).all();
 
     const villages = rows.map((r) => {
@@ -384,6 +411,7 @@ function startServer(port) {
         ownerUsername: r.username || null,
         ownerTelegramId: r.telegram_id,
         civilization: r.civilization,
+        clanTag: r.clan_tag || null,
         isMine,
         distance
       };
@@ -473,6 +501,92 @@ function startServer(port) {
     }
 
     res.json({ messages: formatChatMessages(getRecentMessages(50), dbUser.id) });
+  });
+
+  // Bu kullanicinin klan durumunu getirir.
+  app.post('/api/clan', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+
+    res.json(buildClanStatusPayload(dbUser));
+  });
+
+  // Yeni bir klan kurar.
+  app.post('/api/clan/create', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+
+    const result = createClan(dbUser.id, req.body.name, req.body.tag);
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    const freshUser = db.prepare('SELECT * FROM users WHERE id = ?').get(dbUser.id);
+    res.json(buildClanStatusPayload(freshUser));
+  });
+
+  // Var olan bir klana katilir.
+  app.post('/api/clan/join', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+
+    const result = joinClan(dbUser.id, Number(req.body.clanId));
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    const freshUser = db.prepare('SELECT * FROM users WHERE id = ?').get(dbUser.id);
+    res.json(buildClanStatusPayload(freshUser));
+  });
+
+  // Klandan ayrilir.
+  app.post('/api/clan/leave', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+
+    const result = leaveClan(dbUser.id);
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    const freshUser = db.prepare('SELECT * FROM users WHERE id = ?').get(dbUser.id);
+    res.json(buildClanStatusPayload(freshUser));
+  });
+
+  // Klan lideri, baska bir uyeyi atar.
+  app.post('/api/clan/kick', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+
+    const result = kickMember(dbUser.id, Number(req.body.targetUserId));
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    res.json(buildClanStatusPayload(dbUser));
+  });
+
+  // Klan sohbetindeki son mesajlari getirir.
+  app.post('/api/clan/chat', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+    if (!dbUser.clan_id) return res.status(400).json({ error: 'Bir klanda degilsin.' });
+
+    res.json({ messages: formatChatMessages(getClanMessages(dbUser.clan_id, 50), dbUser.id) });
+  });
+
+  // Klan sohbetine mesaj gonderir.
+  app.post('/api/clan/chat/send', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+    if (!dbUser.clan_id) return res.status(400).json({ error: 'Bir klanda degilsin.' });
+
+    const result = sendClanMessage(dbUser.clan_id, dbUser.id, req.body.message);
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    res.json({ messages: formatChatMessages(getClanMessages(dbUser.clan_id, 50), dbUser.id) });
   });
 
   app.listen(port, () => {

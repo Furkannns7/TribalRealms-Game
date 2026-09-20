@@ -195,6 +195,7 @@ function initDatabase() {
   try { db.exec('ALTER TABLE users ADD COLUMN civilization TEXT'); } catch (err) {}
   try { db.exec('ALTER TABLE villages ADD COLUMN x INTEGER'); } catch (err) {}
   try { db.exec('ALTER TABLE villages ADD COLUMN y INTEGER'); } catch (err) {}
+  try { db.exec('ALTER TABLE users ADD COLUMN clan_id INTEGER'); } catch (err) {}
 
   // Eski test hesaplarina (Asama 1-2'den kalma) varsayilan medeniyet ata,
   // yoksa mini app'te takilip kalirlar.

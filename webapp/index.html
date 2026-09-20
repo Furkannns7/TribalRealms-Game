@@ -194,6 +194,27 @@
   <main id="view-map" hidden>
     <div id="map-scene">
       <svg id="map-svg" viewBox="0 0 50 50" preserveAspectRatio="xMidYMid meet"></svg>
+
+      <svg id="map-compass" viewBox="0 0 40 40">
+        <circle cx="20" cy="20" r="17" class="compass-ring" />
+        <line x1="20" y1="6" x2="20" y2="34" class="compass-cross" />
+        <line x1="6" y1="20" x2="34" y2="20" class="compass-cross" />
+        <polygon points="20,5 24,20 20,17 16,20" class="compass-needle" />
+        <text x="20" y="12" class="compass-label">K</text>
+      </svg>
+
+      <div id="map-dpad">
+        <button class="map-dpad-btn map-dpad-up" data-dir="up" aria-label="Yukarı bak">▲</button>
+        <button class="map-dpad-btn map-dpad-left" data-dir="left" aria-label="Sola bak">◀</button>
+        <button class="map-dpad-btn map-dpad-right" data-dir="right" aria-label="Sağa bak">▶</button>
+        <button class="map-dpad-btn map-dpad-down" data-dir="down" aria-label="Aşağı bak">▼</button>
+      </div>
+
+      <div id="map-zoom-controls">
+        <button id="map-zoom-in" class="map-ctrl-btn" aria-label="Yakınlaştır">+</button>
+        <button id="map-center-btn" class="map-ctrl-btn map-ctrl-center" aria-label="Köyüme dön">⌂</button>
+        <button id="map-zoom-out" class="map-ctrl-btn" aria-label="Uzaklaştır">−</button>
+      </div>
     </div>
   </main>
 
@@ -253,10 +274,41 @@
   </main>
 
   <main id="view-chat" hidden>
+    <div id="chat-scope-toggle" class="chat-scope-toggle hidden">
+      <button class="scope-btn active" data-scope="global">Genel</button>
+      <button class="scope-btn" data-scope="clan">Klanım</button>
+    </div>
     <div id="chat-messages"></div>
     <div class="chat-input-row">
       <input id="chat-input" type="text" class="text-input" placeholder="Mesaj yaz…" maxlength="300" autocomplete="off" />
       <button id="chat-send-btn" class="chat-send-btn">Gönder</button>
+    </div>
+  </main>
+
+  <main id="view-clan" hidden>
+    <div class="panel-scroll">
+      <div id="clan-no-clan-view">
+        <section class="mini-section">
+          <h2 class="mini-heading">Klan Kur</h2>
+          <input id="clan-name-input" type="text" class="text-input" placeholder="Klan adı (ör. Türk Kabilesi)" maxlength="25" />
+          <input id="clan-tag-input" type="text" class="text-input" placeholder="Etiket (2-5 harf, ör. TRK)" maxlength="5" style="text-transform:uppercase" />
+          <button id="clan-create-btn" class="upgrade-btn">Klan Kur</button>
+        </section>
+        <section class="mini-section">
+          <h2 class="mini-heading">Klanlar</h2>
+          <div id="clan-browse-list" class="reports-list"></div>
+        </section>
+      </div>
+
+      <div id="clan-in-clan-view" hidden>
+        <section class="mini-section">
+          <h2 class="mini-heading"><span id="clan-header-name">Klan</span> [<span id="clan-header-tag">TAG</span>]</h2>
+          <div id="clan-members-list" class="queue-list"></div>
+        </section>
+        <section class="mini-section">
+          <button id="clan-leave-btn" class="offer-action-btn cancel" style="width:100%; padding:12px;">Klandan Ayrıl</button>
+        </section>
+      </div>
     </div>
   </main>
 
@@ -290,6 +342,7 @@
     <button class="tab-btn" data-tab="military">Askeriye</button>
     <button class="tab-btn" data-tab="market">Pazar</button>
     <button class="tab-btn" data-tab="chat">Sohbet</button>
+    <button class="tab-btn" data-tab="clan">Klan</button>
     <button class="tab-btn" data-tab="attack">Saldır</button>
   </nav>
 
