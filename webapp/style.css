@@ -1103,6 +1103,80 @@ html, body {
   margin: 10px 0 4px;
 }
 
+/* ---------- Harita: PvE (vaha/haydut) noktalari ---------- */
+
+.map-npc-dot {
+  stroke: var(--wood-dark);
+  stroke-width: 0.12;
+  cursor: pointer;
+}
+
+.map-npc-dot.npc-oasis { fill: #7fae6b; }
+.map-npc-dot.npc-claimed { fill: #a39c8c; opacity: 0.55; }
+.map-npc-dot.npc-bandit { fill: #6b5842; }
+
+.ic-tree-trunk { fill: var(--wood-dark); }
+.ic-tree-leaf { fill: var(--parchment); opacity: 0.95; }
+.ic-tent { fill: var(--parchment); }
+.ic-tent-shade { fill: var(--parchment-dark); }
+.ic-tent-pole { stroke: var(--wood-dark); stroke-width: 1.2; }
+
+/* ---------- Harita: PvE bilgi paneli (koy panelinin ayni deseni) ---------- */
+
+#npc-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 15, 8, 0.5);
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+#npc-sheet-backdrop.hidden { display: none; }
+#npc-sheet-backdrop.show { opacity: 1; }
+
+#npc-info-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: var(--parchment);
+  border-radius: 22px 22px 0 0;
+  padding: 10px 20px calc(20px + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 30px var(--shadow);
+  transform: translateY(100%);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  max-height: 78vh;
+  overflow-y: auto;
+}
+
+#npc-info-sheet.hidden { display: none; }
+#npc-info-sheet.show { transform: translateY(0); }
+
+#npc-sheet-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: var(--parchment-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+#npc-sheet-close svg { width: 14px; height: 14px; stroke: var(--ink); stroke-width: 2.4; }
+
+#npc-sheet-name {
+  font-family: var(--font-display);
+  font-size: 19px;
+  margin: 0 0 2px;
+}
+
 /* ---------- Sohbet ---------- */
 
 #view-chat {

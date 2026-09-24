@@ -50,7 +50,9 @@ function calculateTravelSeconds(fromVillage, toVillage, unitTypes) {
 // Saldiran gucu ile savunan gucunu karsilastirir, kayiplari ve (varsa)
 // hayatta kalan saldirgan birimleri hesaplar. Basit kural: guclu taraf
 // kazanir, kayiplar guc oranina gore olceklenir (max %70).
-function resolveBattle(attackerUnits, defenderArmy) {
+function resolveBattle(attackerUnits, defenderArmy, defenderUnitConfig) {
+  const defConfig = defenderUnitConfig || MILITARY_UNITS;
+
   let attackPower = 0;
   for (const [type, count] of Object.entries(attackerUnits)) {
     attackPower += count * MILITARY_UNITS[type].attack;
@@ -58,7 +60,7 @@ function resolveBattle(attackerUnits, defenderArmy) {
 
   let defensePower = 0;
   for (const row of defenderArmy) {
-    defensePower += row.count * MILITARY_UNITS[row.unit_type].defense;
+    defensePower += row.count * defConfig[row.unit_type].defense;
   }
 
   const attackerWins = attackPower > defensePower;

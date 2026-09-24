@@ -61,6 +61,8 @@
     marketLevel: 1,
     myOffers: [],
     marketOffers: [],
+    mapNpcTargets: [],
+    activeNpcId: null,
     chatMessages: [],
     chatScope: 'global',
     clanStatus: { inClan: false, clan: null, members: [], clans: [] },
@@ -143,7 +145,17 @@
     villageInfoName: document.getElementById('village-info-name'),
     villageInfoOwner: document.getElementById('village-info-owner'),
     villageInfoDetail: document.getElementById('village-info-detail'),
-    villageInfoAttackBtn: document.getElementById('village-info-attack-btn')
+    villageInfoAttackBtn: document.getElementById('village-info-attack-btn'),
+    npcSheetBackdrop: document.getElementById('npc-sheet-backdrop'),
+    npcInfoSheet: document.getElementById('npc-info-sheet'),
+    npcSheetClose: document.getElementById('npc-sheet-close'),
+    npcSheetIconUse: document.getElementById('npc-sheet-icon-use'),
+    npcSheetName: document.getElementById('npc-sheet-name'),
+    npcSheetStatus: document.getElementById('npc-sheet-status'),
+    npcSheetGarrison: document.getElementById('npc-sheet-garrison'),
+    npcAttackBox: document.getElementById('npc-attack-box'),
+    npcUnitList: document.getElementById('npc-unit-list'),
+    npcAttackBtn: document.getElementById('npc-attack-btn')
   };
 
   for (const chip of document.querySelectorAll('.res-chip')) {
@@ -1002,6 +1014,7 @@
     try {
       const data = await apiPost('/api/map', {});
       mapVillages = data.villages;
+      state.mapNpcTargets = data.npcTargets;
       renderMap(data.worldSize, data.villages);
     } catch (err) {
       showToast(err.message || 'Harita yüklenemedi.');
@@ -1142,6 +1155,28 @@
       if (label.textContent) svg.appendChild(label);
     }
 
+    for (const t of state.mapNpcTargets) {
+      const isOasis = t.npcType === 'oasis';
+      const dotClass = isOasis ? (t.claimed ? 'npc-claimed' : 'npc-oasis') : 'npc-bandit';
+
+      const dot = document.createElementNS(ns, 'circle');
+      dot.setAttribute('cx', t.x);
+      dot.setAttribute('cy', t.y);
+      dot.setAttribute('r', 0.95);
+      dot.setAttribute('class', 'map-npc-dot ' + dotClass);
+      dot.addEventListener('click', () => openNpcInfoSheet(t));
+      svg.appendChild(dot);
+
+      const icon = document.createElementNS(ns, 'use');
+      icon.setAttribute('href', isOasis ? '#icon-oasis' : '#icon-bandit-camp');
+      icon.setAttribute('x', t.x - 0.7);
+      icon.setAttribute('y', t.y - 0.7);
+      icon.setAttribute('width', 1.4);
+      icon.setAttribute('height', 1.4);
+      icon.style.pointerEvents = 'none';
+      svg.appendChild(icon);
+    }
+
     applyMapView();
   }
 
@@ -1196,12 +1231,117 @@
     el.viewVillage.hidden = true;
     el.viewMap.hidden = true;
     el.viewMilitary.hidden = true;
+    el.viewMarket.hidden = true;
+    el.viewChat.hidden = true;
+    el.viewClan.hidden = true;
     el.viewAttack.hidden = false;
     el.viewPlaceholder.hidden = true;
+    stopChatPolling();
 
     renderAttack();
     fetchReports();
     el.attackTargetInput.value = target;
+  });
+
+  // ---------------------------------------------------------
+  // HARITA: VAHA / HAYDUT KAMPI BILGI PANELI
+  // ---------------------------------------------------------
+
+  function openNpcInfoSheet(target) {
+    state.activeNpcId = target.id;
+
+    el.npcSheetIconUse.setAttribute('href', target.npcType === 'oasis' ? '#icon-oasis' : '#icon-bandit-camp');
+    el.npcSheetName.textContent = target.name;
+
+    const garrisonText = target.garrison.map((g) => `${g.count} ${g.name}`).join(', ');
+    el.npcSheetGarrison.textContent = `Muhafızlar: ${garrisonText}`;
+
+    if (target.npcType === 'oasis') {
+      if (target.claimed) {
+        el.npcSheetStatus.textContent = target.claimedByMe
+          ? `Bu vaha senin! +%${target.bonusPercent} ${RESOURCE_LABEL[target.bonusResource]} üretimi sağlıyor.`
+          : 'Başka bir oyuncu tarafından ele geçirilmiş.';
+        el.npcAttackBox.style.display = 'none';
+      } else {
+        el.npcSheetStatus.textContent = `Ele geçirirsen: +%${target.bonusPercent} ${RESOURCE_LABEL[target.bonusResource]} üretimi (kalıcı).`;
+        el.npcAttackBox.style.display = '';
+      }
+    } else {
+      el.npcSheetStatus.textContent = 'Yeni başlayanlar için uygun bir yağma hedefi. Kaynakları zamanla yenilenir.';
+      el.npcAttackBox.style.display = '';
+    }
+
+    if (el.npcAttackBox.style.display !== 'none') {
+      el.npcUnitList.innerHTML = '';
+      if (state.army.length === 0) {
+        el.npcUnitList.innerHTML = '<p class="queue-empty">Saldırabileceğin birliğin yok. Önce Askeriye\'den asker eğit.</p>';
+      } else {
+        for (const u of state.army) {
+          const roster = state.unitRoster.find((r) => r.type === u.type);
+          const row = document.createElement('div');
+          row.className = 'unit-select-row';
+          row.innerHTML =
+            `<svg class="unit-role-icon"><use href="#icon-role-${roster ? roster.role : 'attack'}"/></svg>` +
+            `<span class="unit-select-name">${u.name}</span>` +
+            `<span class="unit-select-owned">${u.count} adet</span>` +
+            `<input type="number" class="qty-input" min="0" max="${u.count}" value="0" data-unit="${u.type}" />`;
+          el.npcUnitList.appendChild(row);
+        }
+      }
+      el.npcAttackBtn.disabled = false;
+      el.npcAttackBtn.textContent = 'Saldır';
+    }
+
+    el.npcSheetBackdrop.classList.remove('hidden');
+    el.npcInfoSheet.classList.remove('hidden');
+    requestAnimationFrame(() => {
+      el.npcSheetBackdrop.classList.add('show');
+      el.npcInfoSheet.classList.add('show');
+    });
+  }
+
+  function closeNpcInfoSheet() {
+    state.activeNpcId = null;
+    el.npcSheetBackdrop.classList.remove('show');
+    el.npcInfoSheet.classList.remove('show');
+    setTimeout(() => {
+      el.npcSheetBackdrop.classList.add('hidden');
+      el.npcInfoSheet.classList.add('hidden');
+    }, 250);
+  }
+
+  el.npcSheetClose.addEventListener('click', closeNpcInfoSheet);
+  el.npcSheetBackdrop.addEventListener('click', closeNpcInfoSheet);
+
+  el.npcAttackBtn.addEventListener('click', async () => {
+    const npcId = state.activeNpcId;
+    if (!npcId) return;
+
+    const units = {};
+    el.npcUnitList.querySelectorAll('.qty-input').forEach((input) => {
+      const n = parseInt(input.value, 10) || 0;
+      if (n > 0) units[input.dataset.unit] = n;
+    });
+
+    if (Object.keys(units).length === 0) {
+      showToast('En az bir birlik seç.');
+      return;
+    }
+
+    el.npcAttackBtn.disabled = true;
+    el.npcAttackBtn.textContent = 'Gönderiliyor…';
+
+    try {
+      const data = await apiPost('/api/npc/attack', { npcId, units });
+      applyPayload(data);
+      render();
+      showToast(`Saldırı gönderildi! Varış: ${formatDuration(data.travelSeconds)}`);
+      closeNpcInfoSheet();
+    } catch (err) {
+      showToast(err.message || 'Saldırı gönderilemedi.');
+      el.npcAttackBtn.disabled = false;
+      el.npcAttackBtn.textContent = 'Saldır';
+    }
   });
 
   // ---------------------------------------------------------

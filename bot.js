@@ -10,6 +10,7 @@ require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const { initDatabase } = require('./database');
 const { getOrCreateUser } = require('./players');
+const { seedNpcTargets } = require('./npc');
 const { startScheduler } = require('./scheduler');
 const { startServer } = require('./server');
 
@@ -31,6 +32,10 @@ const bot = new Telegraf(BOT_TOKEN);
 
 // Veritabani tablolarini (yoksa) olustur.
 initDatabase();
+
+// Dunya ilk kez ayaga kalkiyorsa vaha/haydut kamplarini serpistir (guvenli:
+// zaten doluysa hicbir sey yapmaz).
+seedNpcTargets();
 
 // Koyu acan Mini App butonunu olusturur.
 function openVillageKeyboard() {
@@ -63,14 +68,11 @@ bot.command('koy', (ctx) => {
 // BOTU VE ARKA PLAN SERVISLERINI BASLAT
 // ---------------------------------------------------------
 
-// 1. Once web sunucusunu ve zamanlayiciyi baslat (Render port taramasini gecmek icin)
-startServer(PORT);
-startScheduler();
-
-// 2. Telegram botunu baslat
 bot.launch()
   .then(() => {
     console.log('Bot basariyla baslatildi!');
+    startScheduler();
+    startServer(PORT);
   })
   .catch((err) => console.error('Bot baslatilamadi:', err));
 

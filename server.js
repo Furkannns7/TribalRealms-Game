@@ -10,7 +10,7 @@ const crypto = require('crypto');
 const path = require('path');
 const { db } = require('./database');
 const {
-  BUILDINGS, CIVILIZATIONS, MILITARY_UNITS, WORLD_SIZE,
+  BUILDINGS, CIVILIZATIONS, MILITARY_UNITS, NPC_UNITS, WORLD_SIZE,
   getUpgradeCost, getUpgradeTimeSeconds, getUnitsForCivilization, getTrainTimeSeconds
 } = require('./game-config');
 const { getVillageBuildings, getBuilding, startUpgrade, refreshVillage } = require('./buildings');
@@ -22,6 +22,7 @@ const {
 const { getVillageOffers, getOtherOffers, createOffer, cancelOffer, acceptOffer } = require('./market');
 const { getRecentMessages, sendMessage, getClanMessages, sendClanMessage } = require('./chat');
 const { getClanById, getClanMembers, getAllClans, createClan, joinClan, leaveClan, kickMember } = require('./clans');
+const { getMapNpcTargets, getNpcTarget, attackNpcTarget, getOutgoingNpcAttacks } = require('./npc');
 
 const BOT_TOKEN = (process.env.BOT_TOKEN || '').trim();
 
@@ -370,6 +371,39 @@ function startServer(port) {
     });
   });
 
+  // Bir vaha ya da haydut kampina (PvE) saldiri gonderir.
+  app.post('/api/npc/attack', (req, res) => {
+    const dbUser = authenticateUser(req.body.initData);
+    if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
+    const village = getVillageForUser(dbUser);
+    if (!village) return res.status(404).json({ error: 'Once koy kurmalisin.' });
+
+    const npcId = Number(req.body.npcId);
+    const units = req.body.units;
+    if (!npcId || typeof units !== 'object' || units === null) {
+      return res.status(400).json({ error: 'Gecersiz istek.' });
+    }
+
+    const unitsMap = {};
+    for (const [type, qty] of Object.entries(units)) {
+      const n = Math.floor(Number(qty));
+      if (n > 0) unitsMap[type] = n;
+    }
+
+    const result = attackNpcTarget(village.id, npcId, unitsMap);
+    if (!result.success) {
+      return res.status(400).json({ error: result.reason });
+    }
+
+    res.json({
+      success: true,
+      travelSeconds: result.travelSeconds,
+      arrivesAt: result.arrivesAt,
+      targetName: result.targetName,
+      ...buildVillagePayload(village.id, dbUser.id)
+    });
+  });
+
   // Bu kullanicinin (saldiran ya da savunan olarak) katildigi savas
   // raporlarini (yagmalama loglarini) getirir.
   app.post('/api/reports', (req, res) => {
@@ -417,7 +451,23 @@ function startServer(port) {
       };
     });
 
-    res.json({ worldSize: WORLD_SIZE, villages });
+    const npcTargets = getMapNpcTargets().map((t) => ({
+      id: t.id,
+      npcType: t.type,
+      name: t.name,
+      x: t.x,
+      y: t.y,
+      bonusResource: t.bonus_resource,
+      bonusPercent: t.bonus_percent,
+      claimed: !!t.claimed_by_village_id,
+      claimedByMe: !!myVillage && t.claimed_by_village_id === myVillage.id,
+      garrison: Object.entries(JSON.parse(t.garrison)).map(([type, count]) => ({
+        name: NPC_UNITS[type] ? NPC_UNITS[type].name : type,
+        count
+      }))
+    }));
+
+    res.json({ worldSize: WORLD_SIZE, villages, npcTargets });
   });
 
   // Bu koyun pazar durumunu (seviye, kendi teklifleri, baskalarinin

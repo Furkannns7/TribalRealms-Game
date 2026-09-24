@@ -188,6 +188,48 @@ function initDatabase() {
     )
   `);
 
+  // ---- NPC_TARGETS TABLOSU (PvE: Vahalar + Haydut Kamplari) ----
+  // "type": 'oasis' (vaha) ya da 'bandit_camp' (haydut kampi).
+  // Vahalar icin: bonus_resource/bonus_percent (ele gecirilince koye
+  // saglanan surekli uretim bonusu) ve claimed_by_village_id (kim sahip).
+  // Haydut kamplari icin: loot_* sutunlari zamanla yeniden dolan bir
+  // kaynak stogu tutar (last_regen'e gore).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS npc_targets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      name TEXT NOT NULL,
+      x INTEGER NOT NULL,
+      y INTEGER NOT NULL,
+      garrison TEXT NOT NULL,
+      bonus_resource TEXT,
+      bonus_percent INTEGER,
+      claimed_by_village_id INTEGER,
+      loot_wood INTEGER DEFAULT 0,
+      loot_clay INTEGER DEFAULT 0,
+      loot_iron INTEGER DEFAULT 0,
+      loot_grain INTEGER DEFAULT 0,
+      loot_capacity INTEGER DEFAULT 0,
+      last_regen DATETIME DEFAULT CURRENT_TIMESTAMP,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // ---- NPC_ATTACKS TABLOSU ----
+  // Bir vaha/haydut kampina giden, henuz varmamis saldirilar.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS npc_attacks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      attacker_village_id INTEGER NOT NULL,
+      npc_target_id INTEGER NOT NULL,
+      units TEXT NOT NULL,
+      arrives_at DATETIME NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (attacker_village_id) REFERENCES villages(id),
+      FOREIGN KEY (npc_target_id) REFERENCES npc_targets(id)
+    )
+  `);
+
   // ---- MIGRATION (onceki asamalardan kalma eski game.db dosyalari icin) ----
   // Asagidaki ALTER'lar sutun zaten varsa sessizce hata verir, o hata yoksayilir.
   try { db.exec('ALTER TABLE buildings ADD COLUMN upgrading INTEGER DEFAULT 0'); } catch (err) {}

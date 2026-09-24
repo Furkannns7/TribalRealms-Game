@@ -9,6 +9,7 @@ const { db } = require('./database');
 const { refreshVillage } = require('./buildings');
 const { completeFinishedTraining } = require('./military');
 const { completeFinishedAttacks } = require('./combat');
+const { completeFinishedNpcAttacks } = require('./npc');
 
 function startScheduler() {
   cron.schedule('* * * * *', () => {
@@ -20,6 +21,7 @@ function startScheduler() {
     // Saldirilar birden fazla koyu ilgilendirdigi icin tek seferde, tum
     // veritabani genelinde kontrol ediliyor.
     completeFinishedAttacks();
+    completeFinishedNpcAttacks();
   });
 
   console.log('Zamanlayici baslatildi (her dakika calisiyor).');

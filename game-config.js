@@ -110,6 +110,15 @@ const BUILDINGS = {
   }
 };
 
+// Vaha ve haydut kamplarini koruyan NPC birimleri (PvE eklentisi). Bunlarin
+// sadece "defense" degeri kullanilir, saldirmazlar.
+const NPC_UNITS = {
+  wolf: { name: 'Kurt', defense: 18 },
+  bear: { name: 'Ayı', defense: 45 },
+  boar: { name: 'Yaban Domuzu', defense: 12 },
+  bandit: { name: 'Haydut', defense: 22 }
+};
+
 // ---------------------------------------------------------
 // MEDENIYETLER VE ASKERI BIRIMLER
 // ---------------------------------------------------------
@@ -204,6 +213,7 @@ module.exports = {
   WORLD_SIZE,
   CIVILIZATIONS,
   MILITARY_UNITS,
+  NPC_UNITS,
   getUpgradeCost,
   getUpgradeTimeSeconds,
   getProductionPerHour,

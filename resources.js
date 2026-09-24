@@ -6,6 +6,7 @@
 // plandaki zamanlayici (scheduler.js) tarafindan da periyodik olarak cagrilir.
 
 const { db } = require('./database');
+const { getOasisBonusMultiplier } = require('./npc');
 
 // Tek bir koyun kaynaklarini "su ana kadar" gecen sureye gore gunceller.
 // `village` parametresi villages tablosundan gelen bir satir olmalidir.
@@ -18,10 +19,17 @@ function syncVillageResources(village) {
     return village;
   }
 
-  const newWood = Math.min(village.warehouse_capacity, village.wood + village.wood_production * elapsedHours);
-  const newClay = Math.min(village.warehouse_capacity, village.clay + village.clay_production * elapsedHours);
-  const newIron = Math.min(village.warehouse_capacity, village.iron + village.iron_production * elapsedHours);
-  const newGrain = Math.min(village.granary_capacity, village.grain + village.grain_production * elapsedHours);
+  // Ele gecirilmis vahalar varsa, ilgili kaynagin uretimine bonus ekler
+  // (ornegin +%25 icin carpan 1.25 olur).
+  const woodRate = village.wood_production * getOasisBonusMultiplier(village.id, 'wood');
+  const clayRate = village.clay_production * getOasisBonusMultiplier(village.id, 'clay');
+  const ironRate = village.iron_production * getOasisBonusMultiplier(village.id, 'iron');
+  const grainRate = village.grain_production * getOasisBonusMultiplier(village.id, 'grain');
+
+  const newWood = Math.min(village.warehouse_capacity, village.wood + woodRate * elapsedHours);
+  const newClay = Math.min(village.warehouse_capacity, village.clay + clayRate * elapsedHours);
+  const newIron = Math.min(village.warehouse_capacity, village.iron + ironRate * elapsedHours);
+  const newGrain = Math.min(village.granary_capacity, village.grain + grainRate * elapsedHours);
 
   const update = db.prepare(`
     UPDATE villages

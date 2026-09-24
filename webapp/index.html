@@ -154,6 +154,19 @@
     <path d="M16 4 L27 8 V16 C27 23 22 28 16 30 C10 28 5 23 5 16 V8 Z" class="ic-shield" />
   </symbol>
 
+  <symbol id="icon-oasis" viewBox="0 0 32 32">
+    <rect x="14" y="17" width="4" height="11" class="ic-tree-trunk" />
+    <circle cx="16" cy="11" r="8" class="ic-tree-leaf" />
+    <circle cx="9" cy="15" r="6" class="ic-tree-leaf" />
+    <circle cx="23" cy="15" r="6" class="ic-tree-leaf" />
+  </symbol>
+
+  <symbol id="icon-bandit-camp" viewBox="0 0 32 32">
+    <line x1="16" y1="6" x2="16" y2="2" class="ic-tent-pole" />
+    <polygon points="16,5 27,27 5,27" class="ic-tent" />
+    <polygon points="16,5 19.5,27 12.5,27" class="ic-tent-shade" />
+  </symbol>
+
 </defs>
 </svg>
 
@@ -407,6 +420,31 @@
   <p id="village-info-owner" class="sheet-cost-label">Sahip</p>
   <p id="village-info-detail" class="sheet-time">Medeniyet · Mesafe</p>
   <button id="village-info-attack-btn" class="upgrade-btn">Bu Köye Saldır</button>
+</div>
+
+<!-- ===== HARITA: VAHA / HAYDUT KAMPI BILGI PANELI ===== -->
+<div id="npc-sheet-backdrop" class="hidden"></div>
+<div id="npc-info-sheet" class="hidden">
+  <div class="sheet-handle"></div>
+  <button id="npc-sheet-close" aria-label="Kapat">
+    <svg><use href="#icon-close" /></svg>
+  </button>
+
+  <div class="sheet-header">
+    <svg id="npc-sheet-icon" class="sheet-building-icon"><use id="npc-sheet-icon-use" href="#icon-oasis" /></svg>
+    <div>
+      <h2 id="npc-sheet-name">Vaha</h2>
+      <p id="npc-sheet-status" class="sheet-cost-label">Durum</p>
+    </div>
+  </div>
+
+  <p id="npc-sheet-garrison" class="sheet-time"></p>
+
+  <div id="npc-attack-box">
+    <p class="sheet-cost-label">Gönderilecek Birlikler</p>
+    <div id="npc-unit-list" class="unit-select-list"></div>
+    <button id="npc-attack-btn" class="upgrade-btn">Saldır</button>
+  </div>
 </div>
 
 <script src="app.js"></script>
