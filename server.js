@@ -1,9 +1,5 @@
 // server.js
-// Kucuk bir web sunucusu: hem Telegram Mini App'in (Web App) dosyalarini
-// (webapp/ klasoru) sunar hem de mini app'in kullandigi API uc noktalarini
-// saglar: koy/bina verisi, medeniyet secimi, asker egitimi, saldiri ve
-// savas raporlari. bot.js ile AYNI surecte, ayni veritabanini paylasarak
-// calisir — ayri bir sunucu baslatmana gerek yok.
+// Mini App sunucusu ve API uclari.
 
 const express = require('express');
 const crypto = require('crypto');
@@ -59,8 +55,6 @@ function verifyInitData(initData) {
   }
 }
 
-// initData'yi dogrulayip veritabanindaki kullaniciyi dondurur (koyu olsun
-// olmasin). Basarisiz olursa null doner.
 function authenticateUser(initData) {
   const tgUser = verifyInitData(initData);
   if (!tgUser) return null;
@@ -148,7 +142,6 @@ function buildVillagePayload(villageId, userId) {
   };
 }
 
-// Ham bir savas raporu satirini, bakan kisiye gore okunabilir hale getirir.
 function formatReport(row, viewerUserId) {
   const isAttacker = row.attacker_user_id === viewerUserId;
   const unitsSent = JSON.parse(row.units_sent);
@@ -176,8 +169,6 @@ function formatReport(row, viewerUserId) {
   };
 }
 
-// Bir koyun pazar durumunu (seviye, kendi teklifleri, baskalarinin
-// teklifleri, guncel kaynaklar) mini app'in anlayacagi JSON'a cevirir.
 function buildMarketPayload(villageId) {
   const village = refreshVillage(villageId);
   const marketBuilding = getBuilding(villageId, 'market');
@@ -221,8 +212,6 @@ function formatChatMessages(rows, viewerUserId) {
   }));
 }
 
-// Bu kullanicinin klan durumunu (klandaysa uye listesiyle, degilse
-// katilinabilecek klan listesiyle) mini app'in anlayacagi JSON'a cevirir.
 function buildClanStatusPayload(dbUser) {
   if (!dbUser.clan_id) {
     return {
@@ -246,12 +235,11 @@ function buildClanStatusPayload(dbUser) {
 }
 
 function startServer(port) {
+  const actualPort = process.env.PORT || port || 3000;
   const app = express();
   app.use(express.json());
   app.use(express.static(path.join(__dirname, 'webapp')));
 
-  // Koy + binalar + ordu verisini getirir. Koy yoksa (henuz medeniyet
-  // secilmemis) bunun yerine secim ekrani icin gereken veriyi dondurur.
   app.post('/api/village', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) {
@@ -270,7 +258,6 @@ function startServer(port) {
     res.json(buildVillagePayload(village.id, dbUser.id));
   });
 
-  // Ilk koyu, secilen medeniyetle birlikte olusturur.
   app.post('/api/choose-civilization', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) {
@@ -291,7 +278,6 @@ function startServer(port) {
     res.json(buildVillagePayload(village.id, dbUser.id));
   });
 
-  // Bir binayi bir ust seviyeye yukseltmeyi dener.
   app.post('/api/upgrade', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -311,7 +297,6 @@ function startServer(port) {
     res.json({ success: true, timeSeconds: result.timeSeconds, ...buildVillagePayload(village.id, dbUser.id) });
   });
 
-  // Asker egitimi baslatir.
   app.post('/api/train', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -338,7 +323,6 @@ function startServer(port) {
     res.json({ success: true, ...buildVillagePayload(village.id, dbUser.id) });
   });
 
-  // Baska bir oyuncunun koyune saldiri gonderir.
   app.post('/api/attack', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -371,7 +355,6 @@ function startServer(port) {
     });
   });
 
-  // Bir vaha ya da haydut kampina (PvE) saldiri gonderir.
   app.post('/api/npc/attack', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -404,8 +387,6 @@ function startServer(port) {
     });
   });
 
-  // Bu kullanicinin (saldiran ya da savunan olarak) katildigi savas
-  // raporlarini (yagmalama loglarini) getirir.
   app.post('/api/reports', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -415,9 +396,6 @@ function startServer(port) {
     res.json({ reports: rows.map((r) => formatReport(r, dbUser.id)) });
   });
 
-  // Dunya haritasindaki tum koyleri (sahibi, medeniyeti, konumu, benden
-  // uzakligi) getirir. Kaynak/ordu bilgisi PAYLASILMAZ, sadece harita icin
-  // gereken genel bilgiler doner.
   app.post('/api/map', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -470,8 +448,6 @@ function startServer(port) {
     res.json({ worldSize: WORLD_SIZE, villages, npcTargets });
   });
 
-  // Bu koyun pazar durumunu (seviye, kendi teklifleri, baskalarinin
-  // teklifleri) getirir.
   app.post('/api/market', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -481,7 +457,6 @@ function startServer(port) {
     res.json(buildMarketPayload(village.id));
   });
 
-  // Yeni bir takas teklifi olusturur.
   app.post('/api/market/create', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -502,7 +477,6 @@ function startServer(port) {
     res.json(buildMarketPayload(village.id));
   });
 
-  // Kendi teklifini iptal eder.
   app.post('/api/market/cancel', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -517,7 +491,6 @@ function startServer(port) {
     res.json(buildMarketPayload(village.id));
   });
 
-  // Baska bir oyuncunun teklifini kabul eder.
   app.post('/api/market/accept', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -532,7 +505,6 @@ function startServer(port) {
     res.json(buildMarketPayload(village.id));
   });
 
-  // Genel sohbetteki son mesajlari getirir.
   app.post('/api/chat', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -540,7 +512,6 @@ function startServer(port) {
     res.json({ messages: formatChatMessages(getRecentMessages(50), dbUser.id) });
   });
 
-  // Genel sohbete yeni bir mesaj gonderir.
   app.post('/api/chat/send', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -553,7 +524,6 @@ function startServer(port) {
     res.json({ messages: formatChatMessages(getRecentMessages(50), dbUser.id) });
   });
 
-  // Bu kullanicinin klan durumunu getirir.
   app.post('/api/clan', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -561,7 +531,6 @@ function startServer(port) {
     res.json(buildClanStatusPayload(dbUser));
   });
 
-  // Yeni bir klan kurar.
   app.post('/api/clan/create', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -575,7 +544,6 @@ function startServer(port) {
     res.json(buildClanStatusPayload(freshUser));
   });
 
-  // Var olan bir klana katilir.
   app.post('/api/clan/join', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -589,7 +557,6 @@ function startServer(port) {
     res.json(buildClanStatusPayload(freshUser));
   });
 
-  // Klandan ayrilir.
   app.post('/api/clan/leave', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -603,7 +570,6 @@ function startServer(port) {
     res.json(buildClanStatusPayload(freshUser));
   });
 
-  // Klan lideri, baska bir uyeyi atar.
   app.post('/api/clan/kick', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -616,7 +582,6 @@ function startServer(port) {
     res.json(buildClanStatusPayload(dbUser));
   });
 
-  // Klan sohbetindeki son mesajlari getirir.
   app.post('/api/clan/chat', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -625,7 +590,6 @@ function startServer(port) {
     res.json({ messages: formatChatMessages(getClanMessages(dbUser.clan_id, 50), dbUser.id) });
   });
 
-  // Klan sohbetine mesaj gonderir.
   app.post('/api/clan/chat/send', (req, res) => {
     const dbUser = authenticateUser(req.body.initData);
     if (!dbUser) return res.status(401).json({ error: 'Dogrulama basarisiz.' });
@@ -639,8 +603,9 @@ function startServer(port) {
     res.json({ messages: formatChatMessages(getClanMessages(dbUser.clan_id, 50), dbUser.id) });
   });
 
-  app.listen(port, () => {
-    console.log(`Mini App sunucusu http://localhost:${port} adresinde calisiyor.`);
+  // 0.0.0.0 host eklemesi yapildi:
+  app.listen(actualPort, '0.0.0.0', () => {
+    console.log(`Mini App sunucusu ${actualPort} portunda (0.0.0.0) dinleniyor...`);
   });
 }
 
